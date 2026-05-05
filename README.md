@@ -37,10 +37,10 @@
 ## 🧬 Core Modules
 
 ### 1. Quantum Chemistry (Molecular Eigensolver)
-Simulating molecules beyond simple $H_2$. Our quantum engine utilizes the **Variational Quantum Eigensolver (VQE)** to calculate the ground state energy of complex organic structures.
+Simulating molecules beyond simple H₂. Our quantum engine utilizes the **Variational Quantum Eigensolver (VQE)** to calculate the ground state energy of complex organic structures.
 
 <div align="center">
-  <img src="https://media.giphy.com/media/26n6WvwZwoUCA2EpO/giphy.gif" width="400" alt="Spinning Molecule Animation">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/a/a4/Caffeine_3d_animation.gif" width="400" alt="Spinning Molecule Animation">
 </div>
 
 * **Supported Molecules:** Hydrogen (H₂), Lithium Hydride (LiH), Water (H₂O), Ethane (C₂H₆), and Caffeine (C₈H₁₀N₄O₂).
@@ -51,7 +51,7 @@ Simulating molecules beyond simple $H_2$. Our quantum engine utilizes the **Vari
 A Bloomberg-inspired terminal powered by the **Quantum Approximate Optimization Algorithm (QAOA)**.
 
 <div align="center">
-  <img src="https://media.giphy.com/media/mXnO9IiWWjmE0/giphy.gif" width="400" alt="Finance Data Stream Animation">
+  <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="400" alt="Finance Data Stream Animation">
 </div>
 
 * **Dynamic Portfolio Optimization:** Calculates the "Efficient Frontier" to balance maximum returns against covariance risk.
