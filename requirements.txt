@@ -1,0 +1,16 @@
+qiskit
+qiskit-aer
+qiskit-nature>=0.7.0
+qiskit-ibm-runtime>=0.46.0
+websockets>=16.0
+httpx>=0.28.0
+asyncpg>=0.31.0
+pydantic-settings>=2.14.0
+numpy>=1.26.0
+rdkit>=2023.9.1
+pubchempy>=1.0.4
+pandas>=2.0.0
+yfinance>=0.2.40
+vaderSentiment>=3.3.0
+qiskit-optimization>=0.6.0
+qiskit-finance>=0.4.0

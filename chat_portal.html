@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Q-Bridge Secure Portal</title>
+    <style>
+        body { background-color: #0d1117; color: #39FF14; font-family: monospace; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; border: 1px solid #39FF14; padding: 20px; box-shadow: 0 0 10px #39FF14; }
+        input, button { background: #000; color: #39FF14; border: 1px solid #39FF14; padding: 10px; width: 95%; margin-bottom: 10px; font-family: monospace; }
+        button:hover { background: #39FF14; color: #000; cursor: pointer; font-weight: bold; }
+        .output-box { border: 1px dashed #555; padding: 10px; margin-top: 10px; word-wrap: break-word; }
+        h2 { text-align: center; border-bottom: 1px solid #555; padding-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>[ Q-BRIDGE: QUANTUM SECURE CHAT ]</h2>
+        <input type="text" id="ibmToken" placeholder="Enter IBM Quantum API Token (Optional - Defaults to Local AerSimulator)">
+        <input type="text" id="message" placeholder="Enter classified message payload...">
+        <button onclick="sendMessage()">ENCRYPT & TRANSMIT</button>
+
+        <div class="output-box" id="keyOut"><strong>Quantum Entropy Key:</strong> Awaiting transmission...</div>
+        <div class="output-box" id="cipherOut"><strong>Ciphertext (Intercepted over public network):</strong> ...</div>
+        <div class="output-box" id="plainOut"><strong>Decrypted Message (Secure endpoint):</strong> ...</div>
+    </div>
+
+    <script>
+        async function sendMessage() {
+            const msg = document.getElementById('message').value;
+            if(!msg) return alert("Enter a message payload!");
+
+            // Fetch true random quantum key from the backend API
+            const response = await fetch('/generate_key');
+            const data = await response.json();
+            const key = data.quantum_key || data.key || Object.values(data)[0].toString();
+            
+            document.getElementById('keyOut').innerHTML = "<strong>Quantum Entropy Key:</strong> " + key;
+            
+            // OTP Encryption Logic (XOR)
+            let cipher = "";
+            for(let i = 0; i < msg.length; i++) {
+                cipher += String.fromCharCode(msg.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+            }
+            
+            // Display ciphertext as Hex for the hacker aesthetic
+            let hexCipher = Array.from(cipher).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(' ');
+            document.getElementById('cipherOut').innerHTML = "<strong>Ciphertext (Intercepted):</strong> " + hexCipher;
+
+            // Decrypt Logic
+            let decrypt = "";
+            for(let i = 0; i < cipher.length; i++) {
+                decrypt += String.fromCharCode(cipher.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+            }
+            document.getElementById('plainOut').innerHTML = "<strong>Decrypted Message:</strong> " + decrypt;
+        }
+    </script>
+</body>
+</html>

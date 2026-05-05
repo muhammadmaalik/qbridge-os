@@ -1,0 +1,47 @@
+2026-04-11T15:22:09Z INF Thank you for trying Cloudflare Tunnel. Doing so, without a Cloudflare account, is a quick way to experiment and try it out. However, be aware that these account-less Tunnels have no uptime guarantee, are subject to the Cloudflare Online Services Terms of Use (https://www.cloudflare.com/website-terms/), and Cloudflare reserves the right to investigate your use of Tunnels for violations of such terms. If you intend to use Tunnels in production you should use a pre-created named tunnel by following: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps
+2026-04-11T15:22:09Z INF Requesting new quick Tunnel on trycloudflare.com...
+2026-04-11T15:22:12Z INF +--------------------------------------------------------------------------------------------+
+2026-04-11T15:22:12Z INF |  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |
+2026-04-11T15:22:12Z INF |  https://relevance-contacts-mineral-happens.trycloudflare.com                              |
+2026-04-11T15:22:12Z INF +--------------------------------------------------------------------------------------------+
+2026-04-11T15:22:12Z INF Cannot determine default configuration path. No file [config.yml config.yaml] in [~/.cloudflared ~/.cloudflare-warp ~/cloudflare-warp]
+2026-04-11T15:22:12Z INF Version 2026.3.0 (Checksum 59b12880b24af581cf5b1013db601c7d843b9b097e9c78aa5957c7f39f741885)
+2026-04-11T15:22:12Z INF GOOS: windows, GOVersion: go1.24.13, GoArch: amd64
+2026-04-11T15:22:12Z INF Settings: map[ha-connections:1 protocol:quic url:http://127.0.0.1:8080]
+2026-04-11T15:22:12Z INF cloudflared will not automatically update on Windows systems.
+2026-04-11T15:22:12Z INF Generated Connector ID: 32355c26-c9e9-4683-a62f-32a5f13b05c3
+2026-04-11T15:22:12Z INF Initial protocol quic
+2026-04-11T15:22:12Z INF ICMP proxy will use 172.23.27.38 as source for IPv4
+2026-04-11T15:22:12Z INF ICMP proxy will use fe80::9b51:e82a:fc5d:a6f1 in zone Wi-Fi as source for IPv6
+2026-04-11T15:22:12Z INF cloudflared does not support loading the system root certificate pool on Windows. Please use --origin-ca-pool <PATH> to specify the path to the certificate pool
+2026-04-11T15:22:12Z INF ICMP proxy will use 172.23.27.38 as source for IPv4
+2026-04-11T15:22:12Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveP256] connIndex=0 event=0 ip=198.41.192.167
+2026-04-11T15:22:12Z INF ICMP proxy will use fe80::9b51:e82a:fc5d:a6f1 in zone Wi-Fi as source for IPv6
+2026-04-11T15:22:12Z INF Starting metrics server on 127.0.0.1:20241/metrics
+2026-04-11T15:22:12Z INF Registered tunnel connection connIndex=0 connection=4a06e810-ef01-4af3-b794-c9af548a3e82 event=0 ip=198.41.192.167 location=iad09 protocol=quic
+2026-04-11T16:37:19Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.192.167
+2026-04-11T16:37:19Z ERR failed to run the datagram handler error="timeout: no recent network activity" connIndex=0 event=0 ip=198.41.192.167
+2026-04-11T16:37:19Z ERR failed to serve tunnel connection error="accept stream listener encountered a failure while serving" connIndex=0 event=0 ip=198.41.192.167
+2026-04-11T16:37:19Z ERR Serve tunnel error error="accept stream listener encountered a failure while serving" connIndex=0 event=0 ip=198.41.192.167
+2026-04-11T16:37:19Z INF Retrying connection in up to 1s connIndex=0 event=0 ip=198.41.192.167
+2026-04-11T16:37:21Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveP256] connIndex=0 event=0 ip=198.41.192.167
+2026-04-11T16:37:21Z INF Registered tunnel connection connIndex=0 connection=c392a8ee-91b5-4307-97ba-9a6372d8906c event=0 ip=198.41.192.167 location=iad09 protocol=quic
+2026-04-11T16:37:24Z ERR Failed to refresh DNS local resolver error="lookup region1.v2.argotunnel.com: i/o timeout"
+2026-04-11T16:55:59Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp 127.0.0.1:8080: connectex: No connection could be made because the target machine actively refused it." connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8080
+2026-04-11T16:55:59Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp 127.0.0.1:8080: connectex: No connection could be made because the target machine actively refused it." connIndex=0 dest=https://relevance-contacts-mineral-happens.trycloudflare.com/ event=0 ip=198.41.192.167 type=http
+2026-04-11T16:55:59Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp 127.0.0.1:8080: connectex: No connection could be made because the target machine actively refused it." connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8080
+2026-04-11T16:55:59Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp 127.0.0.1:8080: connectex: No connection could be made because the target machine actively refused it." connIndex=0 dest=https://relevance-contacts-mineral-happens.trycloudflare.com/ event=0 ip=198.41.192.167 type=http
+2026-04-11T16:56:05Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp 127.0.0.1:8080: connectex: No connection could be made because the target machine actively refused it." connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8080
+2026-04-11T16:56:05Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp 127.0.0.1:8080: connectex: No connection could be made because the target machine actively refused it." connIndex=0 dest=https://relevance-contacts-mineral-happens.trycloudflare.com/ event=0 ip=198.41.192.167 type=http
+2026-04-11T17:02:38Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp 127.0.0.1:8080: connectex: No connection could be made because the target machine actively refused it." connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8080
+2026-04-11T17:02:38Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp 127.0.0.1:8080: connectex: No connection could be made because the target machine actively refused it." connIndex=0 dest=https://relevance-contacts-mineral-happens.trycloudflare.com/ event=0 ip=198.41.192.167 type=http
+2026-04-11T17:02:39Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp 127.0.0.1:8080: connectex: No connection could be made because the target machine actively refused it." connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8080
+2026-04-11T17:02:39Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp 127.0.0.1:8080: connectex: No connection could be made because the target machine actively refused it." connIndex=0 dest=https://relevance-contacts-mineral-happens.trycloudflare.com/ event=0 ip=198.41.192.167 type=http
+2026-04-11T17:44:15Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.192.167
+2026-04-11T17:44:15Z ERR failed to run the datagram handler error="timeout: no recent network activity" connIndex=0 event=0 ip=198.41.192.167
+2026-04-11T17:44:15Z ERR failed to serve tunnel connection error="accept stream listener encountered a failure while serving" connIndex=0 event=0 ip=198.41.192.167
+2026-04-11T17:44:15Z ERR Serve tunnel error error="accept stream listener encountered a failure while serving" connIndex=0 event=0 ip=198.41.192.167
+2026-04-11T17:44:15Z INF Retrying connection in up to 1s connIndex=0 event=0 ip=198.41.192.167
+2026-04-11T17:44:16Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveP256] connIndex=0 event=0 ip=198.41.192.167
+2026-04-11T17:44:19Z INF Registered tunnel connection connIndex=0 connection=a308d2ae-597f-4ba6-b41b-15e5407d680c event=0 ip=198.41.192.167 location=iad09 protocol=quic
+2026-04-11T17:44:20Z ERR Failed to refresh DNS local resolver error="lookup region1.v2.argotunnel.com: i/o timeout"

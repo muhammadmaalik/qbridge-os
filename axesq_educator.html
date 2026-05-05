@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QBridge Educator - Visual Composer</title>
+    <!-- Use Tailwind for identical Apple-Style routing aesthetics -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f5f5f7;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #1d1d1f;
+            display: flex;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* Glassmorphism styling matching the main app */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            border-radius: 18px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+        }
+
+        .sidebar {
+            width: 300px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        .workspace {
+            flex-grow: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        .btn-apple {
+            background-color: #0071e3;
+            color: white;
+            border: none;
+            border-radius: 980px;
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0, 113, 227, 0.3);
+            text-align: center;
+        }
+        
+        .btn-apple:hover {
+            background-color: #0077ed;
+            transform: scale(1.02);
+        }
+
+        .btn-secondary {
+            background-color: rgba(0,0,0,0.05);
+            color: #1d1d1f;
+            border-radius: 980px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(0,0,0,0.08);
+        }
+        
+        .help-btn { position: absolute; top: 15px; left: 15px; padding: 8px 16px; border-radius: 980px; background: rgba(255,255,255,0.7); backdrop-filter: blur(10px); border: none; cursor: pointer; font-size: 0.95rem; font-weight: 500; color: #0071e3; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; }
+        .help-btn:hover { background: rgba(255,255,255,0.9); transform: scale(1.02); }
+        .help-modal { display: none; position: absolute; top: 70px; left: 15px; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); padding: 20px; border-radius: 12px; border: 1px solid #d2d2d7; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 300px; z-index: 100; font-size: 0.9rem; line-height: 1.5; color: #1d1d1f; }
+
+        .gate-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .gate-item {
+            background: white;
+            border: 1px solid #e5e5ea;
+            padding: 10px 15px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-monospace;
+        }
+
+        .gate-action {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        select {
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #e5e5ea;
+        }
+
+        .img-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #050505;
+            border-radius: 18px;
+            overflow: hidden;
+            position: relative;
+            min-height: 300px;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+    </style>
+</head>
+<body>
+    <button class="help-btn" onclick="document.getElementById('helpModal').style.display = document.getElementById('helpModal').style.display === 'block' ? 'none' : 'block'">
+        <i class="fa-solid fa-info-circle"></i> Info
+    </button>
+    <div id="helpModal" class="help-modal">
+        <b>2D Educator Visualizer</b><br><br>
+        This is an interactive IDE connecting natively to Qiskit Aer local simulation engines.<br><br>
+        1. Select Gate types.<br>
+        2. Set Target logic.<br>
+        3. Press simulate to compile Mathplotlib blueprints seamlessly onto your canvas viewports!
+    </div>
+
+    <!-- Left Sidebar: Tools & Command Sequence -->
+    <div class="glass-panel sidebar m-4">
+        <div>
+            <h2 class="text-2xl font-bold mb-1">Visual Composer</h2>
+            <p class="text-sm text-gray-500 mb-4">Build Qiskit circuits visually.</p>
+        </div>
+
+        <div class="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-200">
+            <span class="font-medium">Total Qubits:</span>
+            <input type="number" id="qubits" value="2" min="1" max="5" class="w-16 border rounded p-1 text-center">
+        </div>
+
+        <div class="mt-4">
+            <h3 class="font-bold mb-2">Add Gate</h3>
+            <div class="grid grid-cols-3 gap-2">
+                <button onclick="stgGate('H')" class="btn-secondary">H</button>
+                <button onclick="stgGate('X')" class="btn-secondary">X</button>
+                <button onclick="stgGate('CX')" class="btn-secondary">CX</button>
+                <button onclick="stgGate('Y')" class="btn-secondary">Y</button>
+                <button onclick="stgGate('Z')" class="btn-secondary">Z</button>
+                <button onclick="stgGate('SWAP')" class="btn-secondary" style="font-size: 0.75rem;">SWAP</button>
+            </div>
+            
+            <div id="target-ui" class="hidden mt-3 p-3 bg-white border border-gray-200 rounded-xl">
+                <p id="stg-lbl" class="font-bold text-sm mb-2">Configure Gate</p>
+                <div class="flex gap-2">
+                    <select id="tgt-q" class="w-full text-sm"><option value="0">Tgt: q0</option><option value="1">Tgt: q1</option></select>
+                    <select id="ctrl-q" class="w-full text-sm hidden"><option value="0">Ctrl: q0</option><option value="1">Ctrl: q1</option></select>
+                </div>
+                <button onclick="commitGate()" class="btn-secondary w-full mt-2 text-xs">Add to Circuit</button>
+            </div>
+        </div>
+
+        <h3 class="font-bold mt-4">Circuit Sequence</h3>
+        <div id="gate-stack" class="gate-list flex-grow overflow-y-auto">
+            <!-- Gates appear here -->
+        </div>
+
+        <button onclick="resetCircuit()" class="btn-secondary w-full">Clear Board</button>
+        <button onclick="simulate()" class="btn-apple w-full mt-2">Simulate Circuit</button>
+        <a href="/" class="text-center text-sm text-blue-500 hover:underline mt-2">Back to Dashboard</a>
+    </div>
+
+    <!-- Main Workspace: Visualizations -->
+    <div class="workspace p-4 h-full">
+        <h2 class="text-3xl font-bold">Jupyter Render Engine</h2>
+        <p class="text-gray-500 mb-2">Live Matplotlib streams straight from the backend Aer Simulator.</p>
+
+        <!-- Circuit Drawer Box (Top) -->
+        <h3 class="text-lg font-bold">Circuit Architecture</h3>
+        <div class="glass-panel img-container h-64 p-4 shadow-inner" id="circ-box">
+            <p class="text-gray-500 absolute">Click "Simulate Circuit" to render</p>
+            <img id="circ-img" class="hidden" src="" alt="Circuit Diagram">
+        </div>
+
+        <!-- Histogram Box (Bottom) -->
+        <h3 class="text-lg font-bold">Probability Histogram</h3>
+        <div class="glass-panel img-container flex-grow p-4 shadow-inner">
+            <p class="text-gray-500 absolute" id="hist-placeholder">Awaiting execution...</p>
+            <img id="hist-img" class="hidden" src="" alt="Measurement Histogram">
+        </div>
+    </div>
+
+    <script>
+        let currentCircuit = [];
+        let stagedGate = null;
+
+        function updateSelectors() {
+            const numQ = parseInt(document.getElementById('qubits').value);
+            let opts = '';
+            for(let i=0; i<numQ; i++){ opts += `<option value="${i}">q${i}</option>`; }
+            
+            const tgt = document.getElementById('tgt-q');
+            const ctrl = document.getElementById('ctrl-q');
+            const prevT = tgt.value; const prevC = ctrl.value;
+            tgt.innerHTML = opts; ctrl.innerHTML = opts;
+
+            // Preserve if valid
+            if(prevT < numQ) tgt.value = prevT;
+            if(prevC < numQ) ctrl.value = prevC;
+        }
+
+        document.getElementById('qubits').addEventListener('change', updateSelectors);
+        
+        function stgGate(type) {
+            updateSelectors();
+            stagedGate = type;
+            document.getElementById('target-ui').classList.remove('hidden');
+            document.getElementById('stg-lbl').innerText = `Configure ${type} Gate`;
+            
+            const ctrl = document.getElementById('ctrl-q');
+            if(type === 'CX' || type === 'SWAP') {
+                ctrl.classList.remove('hidden');
+                document.getElementById('tgt-q').options[1].selected = true; // Auto select Diff
+            } else {
+                ctrl.classList.add('hidden');
+            }
+        }
+
+        function commitGate() {
+            const tgt = parseInt(document.getElementById('tgt-q').value);
+            let gateObj = { type: stagedGate, target: tgt, control: null };
+            
+            if(stagedGate === 'CX' || stagedGate === 'SWAP') {
+                gateObj.control = parseInt(document.getElementById('ctrl-q').value);
+                if(gateObj.control === gateObj.target) {
+                    alert("Control and Target (or Swap pairs) cannot be the same qubit!");
+                    return;
+                }
+            }
+            
+            currentCircuit.push(gateObj);
+            document.getElementById('target-ui').classList.add('hidden');
+            renderStack();
+        }
+
+        function renderStack() {
+            const stack = document.getElementById('gate-stack');
+            stack.innerHTML = '';
+            currentCircuit.forEach((g, idx) => {
+                const el = document.createElement('div');
+                el.className = 'gate-item text-sm font-semibold text-blue-800 bg-blue-50';
+                let txt = `${g.type} &rarr; Target: q${g.target}`;
+                if(g.control !== null) txt += ` | Ctrl: q${g.control}`;
+                
+                el.innerHTML = `<span>${idx}. ${txt}</span>
+                                <button onclick="removeGate(${idx})" class="text-red-500 hover:text-red-700 font-bold"><i class="fa-solid fa-xmark"></i></button>`;
+                stack.appendChild(el);
+            });
+        }
+
+        function removeGate(idx) {
+            currentCircuit.splice(idx, 1);
+            renderStack();
+        }
+
+        function resetCircuit(){
+            currentCircuit = [];
+            renderStack();
+            document.getElementById('circ-img').classList.add('hidden');
+            document.getElementById('hist-img').classList.add('hidden');
+            document.getElementById('hist-placeholder').classList.remove('hidden');
+        }
+
+        async function simulate() {
+            const btn = document.querySelector('.btn-apple');
+            btn.innerText = "Simulating...";
+            btn.disabled = true;
+
+            const payload = {
+                num_qubits: parseInt(document.getElementById('qubits').value),
+                gates: currentCircuit
+            };
+
+            try {
+                const res = await fetch('/api/educator/simulate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await res.json();
+                if(data.success) {
+                    const cImg = document.getElementById('circ-img');
+                    cImg.src = data.circuit_image;
+                    cImg.classList.remove('hidden');
+                    
+                    const hImg = document.getElementById('hist-img');
+                    hImg.src = data.histogram_image;
+                    hImg.classList.remove('hidden');
+                    document.getElementById('hist-placeholder').classList.add('hidden');
+                } else {
+                    alert("Simulation Error: " + data.error);
+                }
+            } catch(e) {
+                alert("Network error: " + e.message);
+            }
+
+            btn.innerText = "Simulate Circuit";
+            btn.disabled = false;
+        }
+    </script>
+</body>
+</html>

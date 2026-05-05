@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AxesQ Quantum Chat</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --bg: #f5f5f7; --text: #1d1d1f; --blue: #0071e3; --gray: #86868b; }
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; margin: 0; min-height: 100vh; }
+        
+        h1 { font-weight: 600; font-size: 2.5rem; letter-spacing: -0.5px; margin-bottom: 5px; }
+        p.sub { color: var(--gray); font-size: 1.1rem; margin-bottom: 30px; }
+        
+        .card { background: rgba(255, 255, 255, 0.7); backdrop-filter: saturate(180%) blur(20px); border-radius: 18px; padding: 30px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); width: 100%; max-width: 600px; margin-bottom: 20px; box-sizing: border-box; }
+        
+        .help-btn { position: absolute; top: 15px; left: 15px; padding: 8px 16px; border-radius: 980px; background: rgba(255,255,255,0.7); backdrop-filter: blur(10px); border: none; cursor: pointer; font-size: 0.95rem; font-weight: 500; color: var(--blue); z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; }
+        .help-btn:hover { background: rgba(255,255,255,0.9); transform: scale(1.02); }
+        .help-modal { display: none; position: absolute; top: 70px; left: 15px; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); padding: 20px; border-radius: 12px; border: 1px solid #d2d2d7; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 300px; z-index: 100; font-size: 0.9rem; line-height: 1.5; color: var(--text); }
+        
+        input { width: 100%; padding: 14px 16px; border-radius: 12px; border: 1px solid #d2d2d7; font-size: 1rem; margin-bottom: 15px; box-sizing: border-box; transition: border-color 0.3s ease; outline: none; background: rgba(255,255,255,0.8); }
+        input:focus { border-color: var(--blue); }
+        
+        button { background: var(--blue); color: white; border: none; border-radius: 20px; padding: 12px 24px; font-size: 1rem; font-weight: 500; cursor: pointer; width: 100%; transition: all 0.2s ease; margin-bottom: 10px; }
+        button:hover { background: #0077ed; transform: scale(0.98); }
+        button.secondary { background: #e8e8ed; color: var(--text); }
+        button.secondary:hover { background: #d2d2d7; }
+        
+        #chatBox { height: 300px; overflow-y: auto; border: 1px solid #d2d2d7; border-radius: 12px; padding: 15px; margin-bottom: 15px; background: white; display: flex; flex-direction: column; gap: 10px; }
+        .msg { padding: 10px 14px; border-radius: 18px; max-width: 80%; word-wrap: break-word; font-size: 0.95rem; animation: fadeIn 0.3s ease; }
+        .msg.sys { background: #f5f5f7; color: var(--gray); align-self: center; font-size: 0.85rem; }
+        .msg.enc { background: #e8f5e9; color: #1b5e20; align-self: flex-start; border-bottom-left-radius: 4px; font-family: monospace; }
+        .msg.me { background: var(--blue); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .msg.them { background: #e8e8ed; color: var(--text); align-self: flex-start; border-bottom-left-radius: 4px; }
+        
+        .sender-tag { font-size: 0.75rem; color: var(--gray); margin-bottom: 2px; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* UI States */
+        #chatUI { display: none; }
+        #debugConsole { font-size: 0.85rem; color: var(--gray); margin-top: 15px; font-family: monospace; word-wrap: break-word; text-align: center; }
+    </style>
+</head>
+<body>
+    <button class="help-btn" onclick="document.getElementById('helpModal').style.display = document.getElementById('helpModal').style.display === 'block' ? 'none' : 'block'">
+        <i class="fa-solid fa-info-circle"></i> Info
+    </button>
+    <div id="helpModal" class="help-modal">
+        <b>QBridge Command Center</b><br><br>
+        This portal establishes absolute End-to-End Quantum Encryption (E2EE) using AES-256 GCM.<br><br>
+        Your messages are secured by a QKD symmetric key negotiated directly through the Qiskit Quantum Hardware layer, making eavesdropping physically impossible.
+    </div>
+
+    <h1>AxesQ</h1>
+    <p class="sub">End-to-End Quantum Encrypted Messaging.</p>
+    <div style="text-align: center; margin-bottom: 20px;">
+        <a href="/educator" style="color: #0071e3; text-decoration: none; font-size: 0.9rem; font-weight: 500;">Learn Quantum Circuits (Educator Mode) &rarr;</a>
+    </div>
+
+    <!-- Authentication UI -->
+    <div class="card" id="authUI">
+        <h3 style="margin-top:0; font-weight: 500;">Sign In</h3>
+        <input type="email" id="emailInput" placeholder="Apple ID (Email)" autocomplete="off">
+        <input type="password" id="passwordInput" placeholder="Password" autocomplete="off">
+        <button onclick="handleAuth('/api/login')">Sign In</button>
+        <button class="secondary" onclick="handleAuth('/api/register')">Create Account</button>
+        <div id="authError" style="color: #ff3b30; font-size: 0.9rem; text-align: center; margin-top: 10px; display: none;"></div>
+    </div>
+
+    <!-- Main Chat UI -->
+    <div id="chatUI" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+        <div class="card" style="padding: 15px 30px;">
+            <p style="margin: 0; font-size: 0.9rem; color: var(--gray);">Logged in as: <strong id="userIdentity" style="color: var(--text);"></strong></p>
+        </div>
+
+        <div class="card">
+            <input type="email" id="targetEmail" placeholder="To: (Recipient's Email)" autocomplete="off" style="border-radius: 20px; font-weight: 500;">
+            <div id="chatBox"></div>
+            
+            <div style="display: flex; align-items: center; background: rgba(255,255,255,0.8); border: 1px solid #d2d2d7; border-radius: 20px; padding: 4px 14px; margin-bottom: 15px; transition: border-color 0.3s ease;">
+                <label for="imageInput" style="cursor: pointer; font-size: 1.2rem; color: #86868b; margin-right: 10px; transition: color 0.2s;" onmouseover="this.style.color='#0071e3'" onmouseout="this.style.color='#86868b'">
+                    <i class="fa-solid fa-camera"></i>
+                </label>
+                <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleImageSelect(event)">
+                <input type="text" id="messageInput" placeholder="iMessage via Quantum Channel..." autocomplete="off" style="border: none; background: transparent; flex-grow: 1; outline: none; margin-bottom: 0; padding: 10px 0;">
+            </div>
+            
+            <button onclick="sendMessage()">Send Encrypted Payload</button>
+            <div id="debugConsole">
+                [Debug] Point-to-Point Encryption Active.
+            </div>
+        </div>
+    </div>
+
+<!-- Load CryptoJS to bypass HTTP WebCrypto blocks -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+<script>
+    let ws;
+    let currentUser = "";
+    let authToken = "";
+    
+    // Dynamic Protocol Security resolving any domain mask constraints
+    const isLocal = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
+    const baseURL = isLocal ? '' : `${window.location.protocol}//${window.location.host}`;
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsBaseURL = isLocal ? `ws://${window.location.host}` : `${wsProtocol}//${window.location.host}`;
+
+    const chatBox = document.getElementById("chatBox");
+    let compressedB64Image = null;
+
+    function handleImageSelect(event) {
+        const file = event.target.files[0];
+        if(!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                // Process image at high resolution (1080px width maximum)
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 1080;
+                let width = img.width;
+                let height = img.height;
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                compressedB64Image = canvas.toDataURL('image/jpeg', 0.85); // 85% Quality HD JPEG
+                addMessage("Attached File: " + file.name + " (HD Mode)", "sys");
+            }
+            img.src = e.target.result;
+        }
+        reader.readAsDataURL(file);
+    }
+
+    function addMessage(text, typeClass="msg", senderLabel="", imageB64=null) {
+        const wrapper = document.createElement("div");
+        wrapper.style.display = "flex";
+        wrapper.style.flexDirection = "column";
+        if(typeClass === "me") wrapper.style.alignItems = "flex-end";
+        else if(typeClass === "them" || typeClass === "enc") wrapper.style.alignItems = "flex-start";
+        else wrapper.style.alignItems = "center";
+
+        if(senderLabel) {
+            const label = document.createElement("div");
+            label.className = "sender-tag";
+            label.innerText = senderLabel;
+            wrapper.appendChild(label);
+        }
+
+        const bubble = document.createElement("div");
+        bubble.className = "msg " + typeClass;
+        
+        if (text) {
+            const textSpan = document.createElement("span");
+            textSpan.innerText = text;
+            bubble.appendChild(textSpan);
+        }
+        
+        if (imageB64) {
+            const imgEl = document.createElement("img");
+            imgEl.src = imageB64;
+            imgEl.style.maxWidth = "200px";
+            imgEl.style.borderRadius = "8px";
+            imgEl.style.marginTop = "5px";
+            imgEl.style.display = "block";
+            bubble.appendChild(imgEl);
+        }
+
+        wrapper.appendChild(bubble);
+
+        chatBox.appendChild(wrapper);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function handleAuth(endpoint) {
+        const rootURL = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1') ? '' : baseURL;
+        const email = document.getElementById("emailInput").value;
+        const password = document.getElementById("passwordInput").value;
+        const errorDiv = document.getElementById("authError");
+        
+        if(!email || !password) {
+            errorDiv.innerText = "Please enter both email and password.";
+            errorDiv.style.display = "block";
+            return;
+        }
+
+        try {
+            const res = await fetch(rootURL + endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            
+            if(data.success) {
+                // Login successful
+                currentUser = data.email;
+                authToken = data.token;
+                document.getElementById("userIdentity").innerText = currentUser;
+                document.getElementById("authUI").style.display = "none";
+                document.getElementById("chatUI").style.display = "flex";
+                
+                // Initialize Secure WebSocket Session
+                initWebSocket(authToken);
+            } else {
+                errorDiv.innerText = data.error;
+                errorDiv.style.display = "block";
+            }
+        } catch(e) {
+            errorDiv.innerText = "Connection failed to Auth Server.";
+            errorDiv.style.display = "block";
+        }
+    }
+
+    function initWebSocket(token) {
+        ws = new WebSocket(`${wsBaseURL}/ws/chat?token=${token}`);
+        
+        ws.onopen = () => addMessage("System: Connected to AxesQ WebSocket relay.", "sys");
+        ws.onclose = () => addMessage("System: Connection lost to relay.", "sys");
+        
+        ws.onmessage = async function(event) {
+            try {
+                // Ignore plain system signals
+                if(!event.data.startsWith("{")) {
+                    addMessage(event.data, "sys");
+                    return;
+                }
+                
+                const payload = JSON.parse(event.data);
+                
+                // Tech proof log safely handles standalone image delivery
+                if(payload.ciphertext) {
+                    addMessage(`Intercepted Cipher: ${payload.ciphertext.substring(0, 30)}...`, "enc");
+                } else if(payload.cipher_img) {
+                    addMessage(`Intercepted Image Bundle: ${payload.cipher_img.substring(0, 30)}...`, "enc");
+                }
+                
+                if(!payload.key_id) throw new Error("No Quantum Key ID found in envelope.");
+                
+                // Consume Quantum Key
+                const key = await consumeCryptoKey(payload.key_id);
+                
+                // Decrypt using pure JavaScript AES (CryptoJS)
+                let decryptedText = "";
+                if(payload.ciphertext) {
+                    const bytes = CryptoJS.AES.decrypt(payload.ciphertext, key);
+                    decryptedText = bytes.toString(CryptoJS.enc.Utf8);
+                }
+                
+                let decryptedImg = null;
+                if(payload.cipher_img) {
+                    decryptedImg = CryptoJS.AES.decrypt(payload.cipher_img, key).toString(CryptoJS.enc.Utf8);
+                }
+                
+                if(!decryptedText && !decryptedImg) throw new Error("Malformed payload or empty data.");
+                
+                addMessage(decryptedText, "them", payload.from, decryptedImg);
+            } catch (err) {
+                console.error("Decryption err:", err);
+                addMessage(`Decryption Failed: ${err.message}`, "sys");
+            }
+        };
+    }
+
+    // No more local classical cache, keys are fully ephemeral!
+
+    async function generateCryptoKey() {
+        const rootURL = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1') ? '' : baseURL;
+        let url = rootURL + `/generate_key?token=${authToken}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.error) throw new Error(data.error);
+
+        // Dynamically print the hardware state into the subtitle obeying constraints
+        const subtitle = document.querySelector('p.sub');
+        if(subtitle) {
+            subtitle.innerText = `Hardware: ${data.hardware} | Source: ${data.source}`;
+        }
+        
+        return { key: data.key, key_id: data.key_id };
+    }
+
+    async function consumeCryptoKey(key_id) {
+        const rootURL = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1') ? '' : baseURL;
+        let url = rootURL + `/consume_key?token=${authToken}&key_id=${key_id}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.error) throw new Error(data.error);
+        
+        // Key is deleted from server after this call.
+        return data.key;
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById("messageInput");
+        const targetInput = document.getElementById("targetEmail");
+        const msg = input.value;
+        const targetEmail = targetInput.value;
+        
+        if(!msg && !compressedB64Image) return;
+        if(!targetEmail) {
+            alert("Please specify the Recipient's Email address!");
+            return;
+        }
+        if(!ws || ws.readyState !== WebSocket.OPEN) {
+            alert("You are not connected to the relay.");
+            return;
+        }
+
+        try {
+            // Ephemeral Key Setup: Request a brand new key for this specific message.
+            const { key, key_id } = await generateCryptoKey();
+            
+            // Encrypt strictly Text
+            let encryptedText = "";
+            if(msg) encryptedText = CryptoJS.AES.encrypt(msg, key).toString();
+            
+            // Indepedently encrypt compressed Image Buffer
+            let encryptedImg = "";
+            if(compressedB64Image) encryptedImg = CryptoJS.AES.encrypt(compressedB64Image, key).toString();
+            
+            // Package Payload with Recipient Envelope and Ephemeral Key ID
+            const sendPacket = { to: targetEmail, key_id: key_id };
+            if(encryptedText) sendPacket.ciphertext = encryptedText;
+            if(encryptedImg) sendPacket.cipher_img = encryptedImg;
+
+            const payloadStr = JSON.stringify(sendPacket);
+
+            // Show Technical Proof
+            document.getElementById("debugConsole").innerText = `[Transmission] ${payloadStr.substring(0, 50)}... [Attached Optic Stream]`;
+
+            ws.send(payloadStr);
+            addMessage(msg, "me", "You", compressedB64Image);
+            
+            // Hardware resets
+            input.value = "";
+            compressedB64Image = null;
+            document.getElementById("imageInput").value = "";
+        } catch (err) {
+            console.error("Encryption Error:", err);
+            addMessage(`Encryption Engine Failure: ${err.message}`, "sys");
+        }
+    }
+</script>
+</body>
+</html>

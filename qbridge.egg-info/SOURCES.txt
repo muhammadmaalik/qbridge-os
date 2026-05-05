@@ -1,0 +1,9 @@
+setup.py
+qbridge/__init__.py
+qbridge/core.py
+qbridge/pool.py
+qbridge.egg-info/PKG-INFO
+qbridge.egg-info/SOURCES.txt
+qbridge.egg-info/dependency_links.txt
+qbridge.egg-info/requires.txt
+qbridge.egg-info/top_level.txt

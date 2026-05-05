@@ -1,0 +1,18 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    container_name: qbridge_db
+    restart: always
+    environment:
+      POSTGRES_USER: qbridge
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: qaas_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
