@@ -29,7 +29,14 @@ def molecule_request_canonical(req: "MoleculeRequest") -> str:
 
 class MoleculeRequest(BaseModel):
     username: str
-    structure: str | None = None
+    structure: str | None = Field(
+        default=None,
+        description=(
+            "Raw molecule descriptor: formula/name/identifier "
+            "(e.g. H2O, C6H12O6, Aspirin). Dynamically resolved to 3D "
+            "geometry via RDKit/PubChem path in chemistry_mapper."
+        ),
+    )
     smiles: str | None = None
     hardware_provider: str = Field(
         default="ibm",

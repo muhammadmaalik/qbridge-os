@@ -29,6 +29,27 @@ type MoleculeResult = {
   warnings?: string[];
 };
 
+function mapChemistryError(msg: string): string {
+  const t = msg.toLowerCase();
+  if (
+    t.includes("could not resolve") ||
+    t.includes("invalid smiles") ||
+    t.includes("unsupported formula") ||
+    t.includes("pubchem")
+  ) {
+    return "Simulation failed: Unknown or invalid molecule input. Try a valid formula, name, or SMILES.";
+  }
+  if (
+    t.includes("max_qubits") ||
+    t.includes("qubits") ||
+    t.includes("active space") ||
+    t.includes("too complex")
+  ) {
+    return "Simulation failed: Molecule exceeds current qubit quota. Try a smaller molecule or reduce complexity.";
+  }
+  return FRIENDLY_CHEM_ERROR;
+}
+
 const MOLECULES: MoleculeOption[] = [
   { label: "Hydrogen (H2)", value: "H2", mode: "structure" },
   { label: "Lithium Hydride (LiH)", value: "LiH", mode: "structure" },
@@ -103,6 +124,7 @@ async function waitForChemistryResult(jobId: string, timeoutMs = 35000): Promise
 
 export default function ChemistryPage() {
   const [selected, setSelected] = useState<MoleculeOption>(MOLECULES[0]);
+  const [customMolecule, setCustomMolecule] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<MoleculeResult | null>(null);
@@ -118,18 +140,22 @@ export default function ChemistryPage() {
 
     try {
       const session = await establishPqcSession();
+      const useCustom = customMolecule.trim().length > 0;
+      const chosenMode = useCustom ? ("structure" as const) : selected.mode;
+      const chosenValue = useCustom ? customMolecule.trim() : selected.value;
+
       const body: Record<string, unknown> = {
         username: "testuser",
         max_qubits: 28,
         hardware_provider: "ibm",
         noise: false,
       };
-      if (selected.mode === "smiles") body.smiles = selected.value;
-      else body.structure = selected.value;
+      if (chosenMode === "smiles") body.smiles = chosenValue;
+      else body.structure = chosenValue;
 
       const canonical = moleculeRequestCanonical("testuser", {
-        structure: selected.mode === "structure" ? selected.value : "",
-        smiles: selected.mode === "smiles" ? selected.value : "",
+        structure: chosenMode === "structure" ? chosenValue : "",
+        smiles: chosenMode === "smiles" ? chosenValue : "",
         hardwareProvider: "ibm",
         maxQubits: 28,
         scan: "",
@@ -148,7 +174,8 @@ export default function ChemistryPage() {
       });
 
       if (!queueRes.ok) {
-        setError(FRIENDLY_CHEM_ERROR);
+        const detail = await queueRes.text();
+        setError(mapChemistryError(detail));
         return;
       }
       const queueJson = (await queueRes.json()) as { job_id?: string };
@@ -169,8 +196,8 @@ export default function ChemistryPage() {
           warnings: r.warnings ?? [],
         },
       });
-    } catch {
-      setError(FRIENDLY_CHEM_ERROR);
+    } catch (e) {
+      setError(mapChemistryError(String(e)));
     } finally {
       setLoading(false);
     }
@@ -234,6 +261,21 @@ export default function ChemistryPage() {
                 </select>
               </div>
 
+              <div>
+                <label className="mb-2 block text-xs font-medium text-zinc-400">
+                  Custom Molecule Input (formula/name/SMILES)
+                </label>
+                <input
+                  value={customMolecule}
+                  onChange={(e) => setCustomMolecule(e.target.value)}
+                  placeholder="e.g., C6H12O6, Aspirin, C1=CC=CC=C1"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none transition focus:border-violet-400/50 focus:ring-2 focus:ring-violet-500/20"
+                />
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  If provided, custom input overrides the preset dropdown.
+                </p>
+              </div>
+
               <button
                 onClick={runSimulation}
                 disabled={loading}
@@ -261,7 +303,9 @@ export default function ChemistryPage() {
                     />
                   </svg>
                 )}
-                {loading ? "Quantum simulator processing..." : "Run VQE Chemistry Simulation"}
+                {loading
+                  ? "Fetching 3D geometry & computing quantum state..."
+                  : "Run VQE Chemistry Simulation"}
               </button>
 
               {error && (

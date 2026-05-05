@@ -13,3 +13,4 @@ yfinance>=0.2.40
 vaderSentiment>=3.3.0
 qiskit-optimization>=0.6.0
 qiskit-finance>=0.4.0
+pubchempy>=1.0.4

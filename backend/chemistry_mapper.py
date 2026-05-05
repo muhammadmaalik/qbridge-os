@@ -3,7 +3,7 @@ Universal chemical input → :class:`MoleculeInfo` + Jordan–Wigner qubit opera
 
 - SMILES: RDKit 3D conformer (ETKDG + MMFF/UFF), electron count, formula metadata.
 - Plain text: try RDKit SMILES, then PubChemPy (formula / name), then legacy hardcoded formulas.
-- PySCF when available; otherwise :class:`FallbackElectronicStructureDriver` (Windows-safe).
+- Electronic structure: always use :class:`FallbackElectronicStructureDriver` (Windows-safe).
 """
 
 from __future__ import annotations
@@ -236,37 +236,6 @@ def _try_parse_as_smiles(text: str) -> str | None:
     return None
 
 
-def _molecule_info_to_pyscf_atom(mi: MoleculeInfo) -> str:
-    parts = []
-    for sym, xyz in zip(mi.symbols, mi.coords):
-        parts.append(f"{sym} {xyz[0]} {xyz[1]} {xyz[2]}")
-    return "; ".join(parts)
-
-
-def _pyscf_available() -> bool:
-    try:
-        import pyscf  # noqa: F401
-
-        return True
-    except ImportError:
-        return False
-
-
-def _run_pyscf_driver(mi: MoleculeInfo) -> ElectronicStructureProblem:
-    from qiskit_nature.second_q.drivers import PySCFDriver
-
-    spin = max(0, mi.multiplicity - 1)
-    driver = PySCFDriver(
-        atom=_molecule_info_to_pyscf_atom(mi),
-        basis="sto3g",
-        charge=mi.charge,
-        spin=spin,
-    )
-    problem = driver.run()
-    problem.molecule = mi
-    return problem
-
-
 def _trim_active_space(
     problem: ElectronicStructureProblem, max_qubits: int
 ) -> tuple[ElectronicStructureProblem, dict[str, Any]]:
@@ -475,23 +444,19 @@ def _finalize_problem(
     meta: dict[str, Any],
     max_qubits: int,
 ) -> tuple[SparsePauliOp, MoleculeInfo, dict[str, Any]]:
-    if _pyscf_available():
-        problem = _run_pyscf_driver(mi)
-        meta["electronic_structure_driver"] = "PySCFDriver"
-    else:
-        from .fallback_electronic_structure import FallbackElectronicStructureDriver
+    from .fallback_electronic_structure import FallbackElectronicStructureDriver
 
-        problem = FallbackElectronicStructureDriver(
-            formula_key,
-            mi.symbols,
-            list(mi.coords),
-            n_electrons=ne,
-            multiplicity=mi.multiplicity,
-        ).run()
-        problem.molecule = mi
-        meta["electronic_structure_driver"] = "FallbackElectronicStructureDriver"
-        meta["windows_fallback"] = True
-        meta["windows_fallback_notes"] = getattr(problem, "_windows_fallback_notes", "")
+    problem = FallbackElectronicStructureDriver(
+        formula_key,
+        mi.symbols,
+        list(mi.coords),
+        n_electrons=ne,
+        multiplicity=mi.multiplicity,
+    ).run()
+    problem.molecule = mi
+    meta["electronic_structure_driver"] = "FallbackElectronicStructureDriver"
+    meta["windows_fallback"] = True
+    meta["windows_fallback_notes"] = getattr(problem, "_windows_fallback_notes", "")
 
     problem, trim_meta = _trim_active_space(problem, max_qubits=max_qubits)
     meta.update(trim_meta)
