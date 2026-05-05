@@ -1,73 +1,94 @@
-# QBridge: Secure Quantum Infrastructure Gateway
+<div align="center">
 
-## Overview
-**QBridge** is an enterprise-grade, abstracted Python SDK and API Gateway designed to bridge the massive gap between classical developers and complex quantum mechanics. It allows developers, data scientists, and engineers to interact with cutting-edge quantum algorithms seamlessly without ever handwriting a single low-level physics instruction (`Qiskit`).
+# 🌌 QUANTUM BRIDGE OS
+**Advanced Computational Intelligence & Post-Quantum Secure Infrastructure**
 
-Crucially, **QBridge is a Secure API Tunnel**. Because quantum circuit blueprints (IP) are highly valuable, QBridge utilizes **True Quantum Randomness** (derived from Australian National University vacuum fluctuations) to generate cryptographically secure AES-GCM keys. This ensures unoptimized proprietary data is transmitted securely from client edge environments directly to the routing server.
+<br />
 
----
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="100%">
 
-## 🏗️ The QBridge Library Capabilities (The 4 Pillars)
+<br />
 
-The QBridge library is divided into four distinct computational pillars. All you have to do is pass the standard data structures you are used to, and the backend engine securely manages the rest.
+[![Next.js](https://img.shields.io/badge/Frontend-Next.js_15-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Qiskit](https://img.shields.io/badge/Quantum_Engine-IBM_Qiskit-6929C4?style=for-the-badge&logo=ibm)](https://qiskit.org/)
+[![Vercel](https://img.shields.io/badge/Hosted_On-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/)
+[![Render](https://img.shields.io/badge/Hosted_On-Render-46E3B7?style=for-the-badge&logo=render)](https://render.com/)
 
-### 1. Quantum Chemistry (Variational Quantum Eigensolver)
-**Use Case:** Accelerating molecular simulation.
-Instead of building a Hamiltonian matrix manually, simply pass a molecule and its dimensions. QBridge natively calculates identical ground-state physical rotations automatically.
-```python
-chem_result = client.simulate_molecule(molecule="H2O", bond_distance=0.96)
-```
+<p align="center">
+  <a href="#-system-architecture">Architecture</a> •
+  <a href="#-core-modules">Core Modules</a> •
+  <a href="#-installation--quick-start">Quick Start</a> •
+  <a href="#-post-quantum-security-pqc">Security</a>
+</p>
 
-### 2. Quantum Robotics (Interference Pathfinding)
-**Use Case:** Navigating dynamic drone flight paths or routing around physical obstacles.
-Pass a standard 2D dimensional array mapping your grid and obstacle coordinates. The SDK feeds this to a quantum interference algorithm that massively accelerates state-space BFS evaluations.
-```python
-robot_result = client.run_robotics(grid_size=4, obstacles=[[1,1], [2,2]])
-```
-
-### 3. Machine Learning (ZZFeatureMap Hilbert Encoding)
-**Use Case:** Anomaly detection and classification models.
-Load native classical float arrays straight into the SDK. The system effortlessly maps your tensors into a higher-dimensional quantum state vector, paving the way for Quantum Support Vector Machine learning.
-```python
-ml_result = client.run_ml(tensor_array=[0.45, 0.99, -0.21])
-```
-
-### 4. Hardware Optimization & SWAP Routing (Hackathon Computational Track)
-**Use Case:** Processing unmapped logic to physical hardware.
-If you know your logical inputs but have restrictive hardware edge matrices, our advanced compiler natively digests it. It dictates rapid heuristic placement, inserts required SWAP logic, and returns a verified runtime score mapping.
-```python
-# Pass naive programs to constrained hardware matrices
-res = client.optimize_circuit(program=logical_program, hardware_graph=hardware_topology)
-```
+</div>
 
 ---
 
-## 🚀 Startup Instructions
+## 🚀 The Future of Distributed Systems
 
-To fully run the QBridge infrastructure locally or on a production server:
+**Quantum Bridge OS** is a hybrid classical-quantum platform designed to solve the world's most computationally expensive problems. By seamlessly routing tasks between classical server infrastructure and simulated/hardware quantum states, it provides unprecedented real-time insights into **Molecular Dynamics** and **Market Optimization**—all secured by next-generation **Post-Quantum Cryptography (PQC)**.
 
-### 1. Install Dependencies
-Ensure you have the core packages installed.
+> *"We are bridging the gap between today's classical constraints and tomorrow's quantum supremacy."*
+
+---
+
+## 🧬 Core Modules
+
+### 1. Quantum Chemistry (Molecular Eigensolver)
+Simulating molecules beyond simple $H_2$. Our quantum engine utilizes the **Variational Quantum Eigensolver (VQE)** to calculate the ground state energy of complex organic structures.
+
+<div align="center">
+  <img src="https://media.giphy.com/media/26n6WvwZwoUCA2EpO/giphy.gif" width="400" alt="Spinning Molecule Animation">
+</div>
+
+* **Supported Molecules:** Hydrogen (H₂), Lithium Hydride (LiH), Water (H₂O), Ethane (C₂H₆), and Caffeine (C₈H₁₀N₄O₂).
+* **Quantum Mapping:** Uses the **Jordan-Wigner transformation** to map fermionic electron states to quantum qubits.
+* **Live Telemetry:** Real-time visualization of Hartrees, Dipole Moments, and Qubit allocation.
+
+### 2. Algorithmic Quantum Finance
+A Bloomberg-inspired terminal powered by the **Quantum Approximate Optimization Algorithm (QAOA)**.
+
+<div align="center">
+  <img src="https://media.giphy.com/media/mXnO9IiWWjmE0/giphy.gif" width="400" alt="Finance Data Stream Animation">
+</div>
+
+* **Dynamic Portfolio Optimization:** Calculates the "Efficient Frontier" to balance maximum returns against covariance risk.
+* **Sentiment Integration:** Parses Wall Street news via **VADER NLP** to adjust quantum weights based on real-world volatility.
+* **Budget Constraints:** Mathematically enforces asset limits (e.g., forcing the algorithm to find the absolute best 2-stock combination out of a 10-stock pool).
+
+### 3. 🛡️ Post-Quantum Security (PQC)
+Standard encryption (RSA/ECC) will be broken by Shor's Algorithm within the next decade. Quantum Bridge OS is already immune.
+
+* **Lattice-Based Cryptography:** Implementing protocols inspired by NIST-approved standards (Kyber/Dilithium).
+* **Harvest-Now, Decrypt-Later Protection:** Ensures that intercepted data packets cannot be retroactively decrypted by future quantum hardware.
+
+---
+
+## 📊 System Architecture
+
+Quantum Bridge OS utilizes a decoupled **Monorepo** structure, ensuring the highly interactive React frontend never bottlenecks the heavy Python processing backend.
+
+| Component | Technology | Purpose |
+| :--- | :--- | :--- |
+| **User Interface** | Next.js 15, TailwindCSS | Glassmorphism dashboard, dynamic charting, and state management. |
+| **API Gateway** | Python FastAPI, Uvicorn | High-throughput asynchronous routing and PQC handshakes. |
+| **Quantum Engine** | IBM Qiskit, RDKit | Statevector simulation, QUBO problem generation, and QAOA solving. |
+| **Market Data** | Yahoo Finance API, VADER | Real-time historical price scraping and NLP sentiment analysis. |
+
+---
+
+## ⚙️ Installation & Quick Start
+
+Want to run Quantum Bridge OS on your own local infrastructure? 
+
+### Prerequisites
+* `Node.js` (v18+)
+* `Python` (3.11+)
+* `Git`
+
+### 1. Clone the Repository
 ```bash
-pip install fastapi uvicorn qiskit networkx websockets
-```
-
-### 2. Boot the QBridge FastAPI Server
-First, spin up the central compiler backend. This engine receives secure instructions and processes the physical qubits in the background. Note: this keeps your "Entropy Pool" actively caching AES keys.
-```bash
-# From the qbridge_project directory
-python -m uvicorn api:app --host 0.0.0.0 --port 8000
-```
-
-### 3. Exposing the API (Optional but Recommended)
-To accept remote queries (e.g., from an edge drone device or a remote Jupyter Notebook), pipe your local API outward using Cloudflare.
-```bash
-cloudflared tunnel --url http://127.0.0.1:8000 run your-tunnel-name
-```
-*Your frontend endpoint will now route to your locally hosted QBridge Server (e.g., `https://axesq.us`)*
-
-### 4. Run the Full Capabilities Demo
-We have bundled a comprehensive demonstration showcasing how seamlessly a developer utilizes the `QBridgeClient` across all four application domains natively in Python. Make sure your server (step 2) is running first!
-```bash
-python library_demo.py
-```
+git clone [https://github.com/muhammadmaalik/qbridge-os.git](https://github.com/muhammadmaalik/qbridge-os.git)
+cd qbridge-os
