@@ -14,7 +14,7 @@ def main():
     print("=" * 60 + "\n")
     
     # 1. Initialize the Secure E2EE API Client
-    client = QBridgeClient("http://localhost:8000")
+    client = QBridgeClient("https://qbridge-os.onrender.com")
     
     # 2. Locate Benchmarks
     benchmark_dir = "../Bitcamp-2026-Quantum/Computational Track/starter_kit/"

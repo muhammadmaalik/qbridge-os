@@ -20,7 +20,7 @@ def main():
     # ---------------------------------------------------------
     try:
         # Using localhost. If running against production, this would be "https://axesq.us"
-        client = QBridgeClient("http://127.0.0.1:8000")
+        client = QBridgeClient("https://qbridge-os.onrender.com")
         print("[*] Secure API Client Initialized successfully.")
     except Exception as e:
         print(f"[!] Failed to initialize client: {e}")

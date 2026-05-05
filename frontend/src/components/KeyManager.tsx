@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/pqcHandshake";
 
 export default function KeyManager() {
   const [apiKey, setApiKey] = useState("");
@@ -17,7 +18,7 @@ export default function KeyManager() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:8000/api/v1/auth/keys", {
+      const res = await fetch(`${API_BASE}/api/v1/auth/keys`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

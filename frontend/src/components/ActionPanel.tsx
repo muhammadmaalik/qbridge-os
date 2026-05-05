@@ -35,7 +35,7 @@ export default function ActionPanel() {
   const requestEntropy = async () => {
     setLoading("entropy");
     try {
-      await fetch("http://localhost:8000/api/v1/entropy?username=testuser", { method: "GET" });
+      await fetch(`${API_BASE}/api/v1/entropy?username=testuser`, { method: "GET" });
     } catch (e) {
       console.error(e);
     } finally {
@@ -100,7 +100,7 @@ export default function ActionPanel() {
       const ds = "massive_data_01";
       const canonical = `testuser|ORACLE|${ds}`;
       const sig = await pqcSignMessage(sess.sharedSecretHex, canonical);
-      await fetch("http://localhost:8000/api/v1/compute/oracle-sketch", {
+      await fetch(`${API_BASE}/api/v1/compute/oracle-sketch`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

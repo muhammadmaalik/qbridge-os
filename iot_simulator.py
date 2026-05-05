@@ -1,7 +1,7 @@
 import requests
 import time
 
-API_URL = "http://127.0.0.1:8000/api/v1/quantum-key"
+API_URL = "https://qbridge-os.onrender.com/api/v1/quantum-key"
 DEVICE_ID = "Smart-Meter-01"
 
 def simulate():

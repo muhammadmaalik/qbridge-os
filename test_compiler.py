@@ -1,7 +1,7 @@
 from sdks.python.qbridge_sdk import QBridgeClient
 
 def main():
-    client = QBridgeClient("http://localhost:8000")
+    client = QBridgeClient("https://qbridge-os.onrender.com")
     
     # Tiny linear program: H on 0, CX on 0-1, CX on 1-2
     program = [
