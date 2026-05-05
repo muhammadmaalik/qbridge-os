@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { API_BASE } from "@/lib/pqcHandshake";
+
+const FINANCE_OPTIMIZE_URL = "https://qbridge-os.onrender.com/api/v1/finance/optimize";
+const FINANCE_DATA_BASE_URL = "https://qbridge-os.onrender.com/api/v1/finance/data";
+const FRIENDLY_FETCH_ERROR =
+  "Error: Failed to fetch data. Try using fewer stocks or check your tickers.";
 
 type OptimizeResponse = {
   allocation: Record<string, number>;
@@ -113,7 +117,7 @@ export default function FinancePage() {
         return;
       }
 
-      const optimizeRes = await fetch(`${API_BASE}/api/v1/finance/optimize`, {
+      const optimizeRes = await fetch(FINANCE_OPTIMIZE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -124,25 +128,25 @@ export default function FinancePage() {
       });
 
       if (!optimizeRes.ok) {
-        const txt = await optimizeRes.text();
-        setError(`Optimize failed (${optimizeRes.status}): ${txt}`);
+        setError(FRIENDLY_FETCH_ERROR);
         return;
       }
       const optimizeData = (await optimizeRes.json()) as OptimizeResponse;
       setOpt(optimizeData);
 
       const query = encodeURIComponent(tickers.join(","));
-      const dataRes = await fetch(`${API_BASE}/api/v1/finance/data?tickers=${query}&period=${encodeURIComponent(period)}`);
+      const dataRes = await fetch(
+        `${FINANCE_DATA_BASE_URL}?tickers=${query}&period=${encodeURIComponent(period)}`
+      );
       if (!dataRes.ok) {
-        const txt = await dataRes.text();
-        setError(`Data fetch failed (${dataRes.status}): ${txt}`);
+        setError(FRIENDLY_FETCH_ERROR);
         setMarketData(null);
         return;
       }
       const md = (await dataRes.json()) as MarketDataResponse;
       setMarketData(md);
-    } catch (e) {
-      setError(String(e));
+    } catch {
+      setError(FRIENDLY_FETCH_ERROR);
     } finally {
       setLoading(false);
     }
@@ -212,9 +216,31 @@ export default function FinancePage() {
               <button
                 onClick={onOptimize}
                 disabled={loading}
-                className="w-full rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-60 inline-flex items-center justify-center gap-2"
               >
-                {loading ? "Optimizing..." : "Run Quantum Finance Optimize"}
+                {loading && (
+                  <svg
+                    className="h-4 w-4 animate-spin text-emerald-300"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="9"
+                      className="opacity-25"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                    />
+                    <path
+                      d="M21 12a9 9 0 0 1-9 9"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                )}
+                {loading ? "Quantum simulator processing..." : "Run Quantum Finance Optimize"}
               </button>
               {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p>}
             </div>
