@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import KeyManager from "@/components/KeyManager";
 import Console from "@/components/Console";
@@ -75,6 +76,14 @@ export default function Home() {
               Quantum Bridge <span className="font-normal text-zinc-500">OS</span>
             </h1>
             <p className="text-sm text-zinc-500 mt-2 font-medium">QaaS API Gateway Middleware</p>
+            <div className="mt-3 flex items-center gap-2">
+              <Link
+                href="/finance"
+                className="rounded-xl border border-cyan-400/35 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-cyan-200 transition hover:border-cyan-300/60 hover:bg-cyan-500/20"
+              >
+                Quantum Finance
+              </Link>
+            </div>
           </div>
           <div className="hidden md:flex flex-wrap gap-x-5 gap-y-2 font-mono text-xs text-zinc-500 bg-zinc-900/50 px-4 py-2 rounded-full border border-zinc-800/80 shadow-sm">
             <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div> DB: ONLINE</span>
