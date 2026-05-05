@@ -12,7 +12,10 @@ import {
 export default function ActionPanel() {
   const [loading, setLoading] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formula, setFormula] = useState("H2");
+  /** Default: caffeine (complex organic); backend accepts SMILES via structure resolution. */
+  const [formula, setFormula] = useState(
+    "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"
+  );
   const pqcRef = useRef<PqcSession | null>(null);
 
   useEffect(() => {
@@ -179,16 +182,30 @@ export default function ActionPanel() {
             </div>
             
             <div className="mb-6">
-              <label className="block text-sm font-medium text-zinc-400 mb-2">Chemical Formula</label>
+              <label className="block text-sm font-medium text-zinc-400 mb-2">
+                Molecule (formula, name, or SMILES)
+              </label>
               <input
                 type="text"
                 value={formula}
                 onChange={(e) => setFormula(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-700 text-zinc-100 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all font-mono"
-                placeholder="e.g., H2, LiH"
+                className="w-full bg-zinc-900 border border-zinc-700 text-zinc-100 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all font-mono text-sm"
+                placeholder="Caffeine SMILES — or H2, CC (ethane), caffeine"
+                list="molecule-examples"
                 autoFocus
               />
-              <p className="text-xs text-zinc-500 mt-2">Enter the molecular structure for VQE energy calculation.</p>
+              <datalist id="molecule-examples">
+                <option value="CN1C=NC2=C1C(=O)N(C(=O)N2C)C">Caffeine (SMILES)</option>
+                <option value="CC">Ethane</option>
+                <option value="H2">Hydrogen</option>
+                <option value="caffeine">Caffeine (name)</option>
+              </datalist>
+              <p className="text-xs text-zinc-500 mt-2">
+                Default is a full <span className="text-zinc-400">caffeine</span> SMILES for
+                a complex organic demo; simpler species like{" "}
+                <span className="font-mono text-zinc-400">H2</span> or{" "}
+                <span className="font-mono text-zinc-400">CC</span> (ethane) work too.
+              </p>
             </div>
             
             <div className="flex gap-3 justify-end">

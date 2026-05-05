@@ -325,29 +325,40 @@ export default function Console() {
   }, [logs]);
 
   return (
-    <div className="flex min-h-[560px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40 p-0 shadow-sm">
-      <div className="p-4 pb-2 border-b border-zinc-800/60 bg-zinc-950/30">
+    <div
+      id="section-console"
+      className="flex min-h-[560px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40 p-0 shadow-sm"
+    >
+      <div
+        id="section-terminal"
+        className="scroll-mt-28 p-4 pb-2 border-b border-zinc-800/60 bg-zinc-950/30"
+      >
         <h2 className="text-zinc-100 font-semibold text-xs tracking-widest uppercase mb-3 flex items-center gap-2 text-zinc-400">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]" />
           Main Control Unit
         </h2>
         <QuantumTerminal ref={terminalRef} />
       </div>
-      <div className="flex justify-between items-center px-4 py-3 border-b border-zinc-800/80 bg-zinc-900/50">
-        <h3 className="text-zinc-300 font-medium text-sm tracking-wide flex items-center gap-2">
-          <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
-          Recent Activity
-        </h3>
-        <span className="text-xs text-zinc-500 font-medium px-2 py-1 bg-zinc-800/50 rounded-md">Live Feed</span>
-      </div>
-
       <div
-        ref={activityScrollRef}
-        className="custom-scrollbar flex max-h-[280px] min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4"
+        id="section-activity"
+        className="scroll-mt-28 flex min-h-0 flex-1 flex-col border-t border-zinc-800/40"
       >
-        {logs.map((log) => (
-          <ActivityLogRow key={log.id} log={log} />
-        ))}
+        <div className="flex justify-between items-center px-4 py-3 border-b border-zinc-800/80 bg-zinc-900/50">
+          <h3 className="text-zinc-300 font-medium text-sm tracking-wide flex items-center gap-2">
+            <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+            Recent Activity
+          </h3>
+          <span className="text-xs text-zinc-500 font-medium px-2 py-1 bg-zinc-800/50 rounded-md">Live Feed</span>
+        </div>
+
+        <div
+          ref={activityScrollRef}
+          className="custom-scrollbar flex max-h-[280px] min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4"
+        >
+          {logs.map((log) => (
+            <ActivityLogRow key={log.id} log={log} />
+          ))}
+        </div>
       </div>
     </div>
   );

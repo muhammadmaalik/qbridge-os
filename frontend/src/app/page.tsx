@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import KeyManager from "@/components/KeyManager";
 import Console from "@/components/Console";
 import ActionPanel from "@/components/ActionPanel";
+import HelpCenter from "@/components/HelpCenter";
 import { API_BASE, establishPqcSession } from "@/lib/pqcHandshake";
 
 type NoiseInjection = {
@@ -99,7 +100,10 @@ export default function Home() {
             <Console />
           </div>
 
-          <div className="lg:col-span-4 flex flex-col gap-8">
+          <div
+            id="section-security"
+            className="scroll-mt-28 lg:col-span-4 flex flex-col gap-8"
+          >
             <KeyManager />
           </div>
 
@@ -125,6 +129,8 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      <HelpCenter />
     </main>
   );
 }
