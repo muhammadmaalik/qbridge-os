@@ -1,166 +1,39 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <style>
-        @page {
-            size: A4;
-            margin: 0;
-            background-color: #050505;
-        }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #050505;
-            color: #e0e0e0;
-            margin: 0;
-            padding: 40px;
-            line-height: 1.6;
-        }
-        .header {
-            text-align: center;
-            padding: 60px 20px;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
-            border-bottom: 2px solid #4f46e5;
-            position: relative;
-            overflow: hidden;
-        }
-        .header h1 {
-            font-size: 32pt;
-            margin: 0;
-            background: linear-gradient(to right, #818cf8, #c084fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: 2px;
-        }
-        .header p {
-            font-size: 14pt;
-            color: #94a3b8;
-            margin-top: 10px;
-        }
-        .section {
-            margin-top: 40px;
-            padding: 20px;
-            background: rgba(30, 30, 50, 0.5);
-            border-radius: 12px;
-            border: 1px solid #334155;
-        }
-        h2 {
-            color: #818cf8;
-            border-left: 4px solid #818cf8;
-            padding-left: 15px;
-            font-size: 18pt;
-        }
-        .grid {
-            display: table;
-            width: 100%;
-            border-spacing: 20px;
-        }
-        .card {
-            display: table-cell;
-            width: 33%;
-            padding: 20px;
-            background: #0f172a;
-            border: 1px solid #1e293b;
-            border-radius: 8px;
-            vertical-align: top;
-        }
-        .card h3 {
-            color: #f472b6;
-            margin-top: 0;
-        }
-        .badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            background: #4f46e5;
-            color: white;
-            font-size: 9pt;
-            margin-bottom: 10px;
-        }
-        code {
-            background: #1e293b;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: monospace;
-            color: #38bdf8;
-        }
-        .footer {
-            text-align: center;
-            margin-top: 60px;
-            color: #64748b;
-            font-size: 10pt;
-        }
-        /* Simulation of what the "Interactive" parts would look like in the browser */
-        .animation-box {
-            height: 150px;
-            width: 100%;
-            background: #000;
-            border-radius: 8px;
-            margin: 10px 0;
-            border: 1px dashed #4f46e5;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #4f46e5;
-            font-style: italic;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>QUANTUM BRIDGE OS</h1>
-        <p>Advanced Computational Intelligence & Post-Quantum Secure Infrastructure</p>
-    </div>
+# 🌌 Quantum Bridge OS
+> **Computational Intelligence. Post-Quantum Security. Real-Time Finance.**
 
-    <div class="section">
-        <h2>🚀 Overview</h2>
-        <p>
-            Quantum Bridge OS is a next-generation distributed platform combining <strong>Quantum Chemical Simulation</strong>, 
-            <strong>Algorithmic Finance</strong>, and <strong>Post-Quantum Cryptography (PQC)</strong>. Built for a future where 
-            classical and quantum systems coexist, it provides real-time insights into molecular dynamics and market optimization.
-        </p>
-    </div>
+![GitHub License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.14-blue.svg)
+![React](https://img.shields.io/badge/frontend-Next.js-emerald.svg)
 
-    <div class="grid">
-        <div class="card">
-            <div class="badge">CHEMISTRY</div>
-            <h3>Molecular Eigensolver</h3>
-            <p>Simulating complex organic molecules like <strong>Caffeine</strong> and <strong>Ethane</strong> using VQE algorithms.</p>
-            <div class="animation-box">[3D Orbital Rendering Active]</div>
-        </div>
-        <div class="card">
-            <div class="badge">FINANCE</div>
-            <h3>QAOA Optimizer</h3>
-            <p>Dynamic portfolio rebalancing using Quantum Approximate Optimization with VADER news sentiment integration.</p>
-            <div class="animation-box">[Live Market Matrix]</div>
-        </div>
-        <div class="card">
-            <div class="badge">SECURITY</div>
-            <h3>PQC Handshake</h3>
-            <p>Hybrid encryption layers resilient against future quantum decryption threats (Shor's Algorithm protection).</p>
-            <div class="animation-box">[Quantum Key Exchange]</div>
-        </div>
-    </div>
 
-    <div class="section">
-        <h2>🛠️ Technology Stack</h2>
-        <ul>
-            <li><strong>Frontend:</strong> Next.js 15, TailwindCSS, Framer Motion (for animations), Three.js (for 3D models).</li>
-            <li><strong>Backend:</strong> FastAPI, Python 3.14, Qiskit (Quantum SDK), RDKit (Cheminformatics).</li>
-            <li><strong>Data:</strong> Yahoo Finance API + VADER Sentiment Analysis.</li>
-            <li><strong>Deployment:</strong> Vercel (Frontend) & Render (Distributed Backend).</li>
-        </ul>
-    </div>
 
-    <div class="section">
-        <h2>🔧 Quick Start</h2>
-        <p>1. <strong>Clone:</strong> <code>git clone https://github.com/muhammadmaalik/qbridge-os.git</code></p>
-        <p>2. <strong>Setup:</strong> Create <code>.env</code> with your Render Backend URL.</p>
-        <p>3. <strong>Run:</strong> <code>npm run dev</code> for the dashboard.</p>
-    </div>
+## 🚀 The Future of Distributed Systems
+Quantum Bridge OS is a hybrid classical-quantum platform designed to solve the world's most complex problems—from **Molecular Dynamics** to **Portfolio Optimization**—all while secured by **Post-Quantum Cryptography (PQC)**.
 
-    <div class="footer">
-        © 2024 Quantum Bridge OS Project. Engineered for the Post-Quantum Era.
-    </div>
-</body>
-</html>
+---
+
+### 🧪 Features
+
+#### 1. Quantum Chemistry (Beyond H₂)
+Utilizing the **VQE (Variational Quantum Eigensolver)**, we simulate complex molecules like **Caffeine** and **Ethane**. 
+* **Live Rendering:** Real-time 3D electron density visualization.
+* **Accuracy:** Hartree-Fock initial states mapped to Jordan-Wigner qubits.
+
+#### 2. Quantum-Enhanced Finance
+Our **QAOA (Quantum Approximate Optimization Algorithm)** engine processes live market data.
+* **Sentiment Aware:** Integrated VADER NLP reads Wall Street news to adjust risk factors.
+* **Optimization:** Find the "Efficient Frontier" in seconds.
+
+#### 3. PQC Shield
+Secured against the "Quantum Apocalypse."
+* **Handshake:** Lattice-based cryptographic protocols.
+* **Resilience:** Protection against Shor’s algorithm-based decryption.
+
+---
+
+### 🛠️ Installation & Deployment
+
+**Backend (Render)**
+```bash
+pip install -r backend/requirements.txt
+uvicorn backend.main:app --host 0.0.0.0 --port 8000
