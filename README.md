@@ -1,73 +1,166 @@
-# QBridge: Secure Quantum Infrastructure Gateway
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: A4;
+            margin: 0;
+            background-color: #050505;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #050505;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .header {
+            text-align: center;
+            padding: 60px 20px;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            border-bottom: 2px solid #4f46e5;
+            position: relative;
+            overflow: hidden;
+        }
+        .header h1 {
+            font-size: 32pt;
+            margin: 0;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 2px;
+        }
+        .header p {
+            font-size: 14pt;
+            color: #94a3b8;
+            margin-top: 10px;
+        }
+        .section {
+            margin-top: 40px;
+            padding: 20px;
+            background: rgba(30, 30, 50, 0.5);
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+        h2 {
+            color: #818cf8;
+            border-left: 4px solid #818cf8;
+            padding-left: 15px;
+            font-size: 18pt;
+        }
+        .grid {
+            display: table;
+            width: 100%;
+            border-spacing: 20px;
+        }
+        .card {
+            display: table-cell;
+            width: 33%;
+            padding: 20px;
+            background: #0f172a;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            vertical-align: top;
+        }
+        .card h3 {
+            color: #f472b6;
+            margin-top: 0;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: #4f46e5;
+            color: white;
+            font-size: 9pt;
+            margin-bottom: 10px;
+        }
+        code {
+            background: #1e293b;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #38bdf8;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 60px;
+            color: #64748b;
+            font-size: 10pt;
+        }
+        /* Simulation of what the "Interactive" parts would look like in the browser */
+        .animation-box {
+            height: 150px;
+            width: 100%;
+            background: #000;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px dashed #4f46e5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #4f46e5;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>QUANTUM BRIDGE OS</h1>
+        <p>Advanced Computational Intelligence & Post-Quantum Secure Infrastructure</p>
+    </div>
 
-## Overview
-**QBridge** is an enterprise-grade, abstracted Python SDK and API Gateway designed to bridge the massive gap between classical developers and complex quantum mechanics. It allows developers, data scientists, and engineers to interact with cutting-edge quantum algorithms seamlessly without ever handwriting a single low-level physics instruction (`Qiskit`).
+    <div class="section">
+        <h2>🚀 Overview</h2>
+        <p>
+            Quantum Bridge OS is a next-generation distributed platform combining <strong>Quantum Chemical Simulation</strong>, 
+            <strong>Algorithmic Finance</strong>, and <strong>Post-Quantum Cryptography (PQC)</strong>. Built for a future where 
+            classical and quantum systems coexist, it provides real-time insights into molecular dynamics and market optimization.
+        </p>
+    </div>
 
-Crucially, **QBridge is a Secure API Tunnel**. Because quantum circuit blueprints (IP) are highly valuable, QBridge utilizes **True Quantum Randomness** (derived from Australian National University vacuum fluctuations) to generate cryptographically secure AES-GCM keys. This ensures unoptimized proprietary data is transmitted securely from client edge environments directly to the routing server.
+    <div class="grid">
+        <div class="card">
+            <div class="badge">CHEMISTRY</div>
+            <h3>Molecular Eigensolver</h3>
+            <p>Simulating complex organic molecules like <strong>Caffeine</strong> and <strong>Ethane</strong> using VQE algorithms.</p>
+            <div class="animation-box">[3D Orbital Rendering Active]</div>
+        </div>
+        <div class="card">
+            <div class="badge">FINANCE</div>
+            <h3>QAOA Optimizer</h3>
+            <p>Dynamic portfolio rebalancing using Quantum Approximate Optimization with VADER news sentiment integration.</p>
+            <div class="animation-box">[Live Market Matrix]</div>
+        </div>
+        <div class="card">
+            <div class="badge">SECURITY</div>
+            <h3>PQC Handshake</h3>
+            <p>Hybrid encryption layers resilient against future quantum decryption threats (Shor's Algorithm protection).</p>
+            <div class="animation-box">[Quantum Key Exchange]</div>
+        </div>
+    </div>
 
----
+    <div class="section">
+        <h2>🛠️ Technology Stack</h2>
+        <ul>
+            <li><strong>Frontend:</strong> Next.js 15, TailwindCSS, Framer Motion (for animations), Three.js (for 3D models).</li>
+            <li><strong>Backend:</strong> FastAPI, Python 3.14, Qiskit (Quantum SDK), RDKit (Cheminformatics).</li>
+            <li><strong>Data:</strong> Yahoo Finance API + VADER Sentiment Analysis.</li>
+            <li><strong>Deployment:</strong> Vercel (Frontend) & Render (Distributed Backend).</li>
+        </ul>
+    </div>
 
-## 🏗️ The QBridge Library Capabilities (The 4 Pillars)
+    <div class="section">
+        <h2>🔧 Quick Start</h2>
+        <p>1. <strong>Clone:</strong> <code>git clone https://github.com/muhammadmaalik/qbridge-os.git</code></p>
+        <p>2. <strong>Setup:</strong> Create <code>.env</code> with your Render Backend URL.</p>
+        <p>3. <strong>Run:</strong> <code>npm run dev</code> for the dashboard.</p>
+    </div>
 
-The QBridge library is divided into four distinct computational pillars. All you have to do is pass the standard data structures you are used to, and the backend engine securely manages the rest.
-
-### 1. Quantum Chemistry (Variational Quantum Eigensolver)
-**Use Case:** Accelerating molecular simulation.
-Instead of building a Hamiltonian matrix manually, simply pass a molecule and its dimensions. QBridge natively calculates identical ground-state physical rotations automatically.
-```python
-chem_result = client.simulate_molecule(molecule="H2O", bond_distance=0.96)
-```
-
-### 2. Quantum Robotics (Interference Pathfinding)
-**Use Case:** Navigating dynamic drone flight paths or routing around physical obstacles.
-Pass a standard 2D dimensional array mapping your grid and obstacle coordinates. The SDK feeds this to a quantum interference algorithm that massively accelerates state-space BFS evaluations.
-```python
-robot_result = client.run_robotics(grid_size=4, obstacles=[[1,1], [2,2]])
-```
-
-### 3. Machine Learning (ZZFeatureMap Hilbert Encoding)
-**Use Case:** Anomaly detection and classification models.
-Load native classical float arrays straight into the SDK. The system effortlessly maps your tensors into a higher-dimensional quantum state vector, paving the way for Quantum Support Vector Machine learning.
-```python
-ml_result = client.run_ml(tensor_array=[0.45, 0.99, -0.21])
-```
-
-### 4. Hardware Optimization & SWAP Routing (Hackathon Computational Track)
-**Use Case:** Processing unmapped logic to physical hardware.
-If you know your logical inputs but have restrictive hardware edge matrices, our advanced compiler natively digests it. It dictates rapid heuristic placement, inserts required SWAP logic, and returns a verified runtime score mapping.
-```python
-# Pass naive programs to constrained hardware matrices
-res = client.optimize_circuit(program=logical_program, hardware_graph=hardware_topology)
-```
-
----
-
-## 🚀 Startup Instructions
-
-To fully run the QBridge infrastructure locally or on a production server:
-
-### 1. Install Dependencies
-Ensure you have the core packages installed.
-```bash
-pip install fastapi uvicorn qiskit networkx websockets
-```
-
-### 2. Boot the QBridge FastAPI Server
-First, spin up the central compiler backend. This engine receives secure instructions and processes the physical qubits in the background. Note: this keeps your "Entropy Pool" actively caching AES keys.
-```bash
-# From the qbridge_project directory
-python -m uvicorn api:app --host 0.0.0.0 --port 8000
-```
-
-### 3. Exposing the API (Optional but Recommended)
-To accept remote queries (e.g., from an edge drone device or a remote Jupyter Notebook), pipe your local API outward using Cloudflare.
-```bash
-cloudflared tunnel --url http://127.0.0.1:8000 run your-tunnel-name
-```
-*Your frontend endpoint will now route to your locally hosted QBridge Server (e.g., `https://axesq.us`)*
-
-### 4. Run the Full Capabilities Demo
-We have bundled a comprehensive demonstration showcasing how seamlessly a developer utilizes the `QBridgeClient` across all four application domains natively in Python. Make sure your server (step 2) is running first!
-```bash
-python library_demo.py
-```
+    <div class="footer">
+        © 2024 Quantum Bridge OS Project. Engineered for the Post-Quantum Era.
+    </div>
+</body>
+</html>
