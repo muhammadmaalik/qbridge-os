@@ -78,6 +78,12 @@ export default function Home() {
             <p className="text-sm text-zinc-500 mt-2 font-medium">QaaS API Gateway Middleware</p>
             <div className="mt-3 flex items-center gap-2">
               <Link
+                href="/chemistry"
+                className="rounded-xl border border-violet-400/35 bg-violet-500/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-violet-200 transition hover:border-violet-300/60 hover:bg-violet-500/20"
+              >
+                Quantum Chemistry
+              </Link>
+              <Link
                 href="/finance"
                 className="rounded-xl border border-cyan-400/35 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-cyan-200 transition hover:border-cyan-300/60 hover:bg-cyan-500/20"
               >
