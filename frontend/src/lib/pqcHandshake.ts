@@ -77,6 +77,10 @@ export function moleculeRequestCanonical(
   opts: {
     structure?: string | null;
     smiles?: string | null;
+    smilesA?: string | null;
+    smilesB?: string | null;
+    distanceAngstrom?: number;
+    charge?: number;
     hardwareProvider?: string;
     maxQubits?: number;
     scan?: string | null;
@@ -84,12 +88,22 @@ export function moleculeRequestCanonical(
   }
 ): string {
   const hw = (opts.hardwareProvider ?? "ibm").trim().toLowerCase();
-  const q = opts.maxQubits ?? 28;
+  const q = opts.maxQubits ?? 12;
   const scanPart = `|scan:${(opts.scan ?? "").trim()}`;
   const noisePart = opts.noise ? "|noise:1" : "|noise:0";
   const sm = (opts.smiles ?? "").trim();
   if (sm)
     return `${username}|smiles:${sm}|hw:${hw}|q:${q}${scanPart}${noisePart}`;
+
+  const sa = (opts.smilesA ?? "").trim();
+  const sb = (opts.smilesB ?? "").trim();
+  if (sa && sb) {
+    const dist = Number(opts.distanceAngstrom ?? 2.0);
+    const distStr = Number.isInteger(dist) ? `${dist}.0` : dist.toString();
+    const ch = Math.trunc(Number(opts.charge ?? 0));
+    return `${username}|dimer:${sa}+${sb}|dist:${distStr}|charge:${ch}|hw:${hw}|q:${q}${scanPart}${noisePart}`;
+  }
+
   const st = (opts.structure ?? "").trim();
   return `${username}|structure:${st}|hw:${hw}|q:${q}${scanPart}${noisePart}`;
 }

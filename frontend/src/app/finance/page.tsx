@@ -2,12 +2,27 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
-const FINANCE_OPTIMIZE_URL = "https://qbridge-os.onrender.com/api/v1/finance/optimize";
-const FINANCE_DATA_BASE_URL = "https://qbridge-os.onrender.com/api/v1/finance/data";
+import { API_BASE } from "@/lib/pqcHandshake";
+import AuthGuard from "@/components/AuthGuard";
+
+const FINANCE_OPTIMIZE_URL = `${API_BASE}/api/v1/finance/optimize`;
+const FINANCE_DATA_BASE_URL = `${API_BASE}/api/v1/finance/data`;
 const FRIENDLY_FETCH_ERROR =
   "Error: Failed to fetch data. Try using fewer stocks or check your tickers.";
+
+type FrontierPoint = { return: number; risk: number; weights?: Record<string, number> };
 
 type OptimizeResponse = {
   allocation: Record<string, number>;
@@ -15,6 +30,8 @@ type OptimizeResponse = {
   budget: number;
   risk_factor: number;
   objective_value: number;
+  efficient_frontier?: FrontierPoint[];
+  sentiment_scores?: Record<string, number>;
   market?: {
     period?: string;
     start_date?: string;
@@ -107,6 +124,23 @@ export default function FinancePage() {
     [metrics]
   );
 
+  const frontierChart = useMemo(() => {
+    const pts = opt?.efficient_frontier ?? [];
+    return pts.map((p) => ({
+      riskPct: p.risk * 100,
+      returnPct: p.return * 100,
+    }));
+  }, [opt?.efficient_frontier]);
+
+  const sentimentRows = useMemo(() => {
+    const scores = opt?.sentiment_scores ?? marketData?.sentiment_scores;
+    if (!scores) return [];
+    return Object.entries(scores).map(([ticker, score]) => ({
+      ticker,
+      score: Number(score),
+    }));
+  }, [opt?.sentiment_scores, marketData?.sentiment_scores]);
+
   const onOptimize = async () => {
     setLoading(true);
     setError(null);
@@ -153,6 +187,7 @@ export default function FinancePage() {
   };
 
   return (
+    <AuthGuard>
     <main className="min-h-screen bg-zinc-950 px-4 py-6 text-zinc-200 md:px-8">
       <div className="mx-auto max-w-7xl">
         <header className="mb-6 rounded-2xl border border-white/10 bg-zinc-900/40 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl">
@@ -294,6 +329,65 @@ export default function FinancePage() {
                     </ResponsiveContainer>
                   </div>
                 </div>
+                {frontierChart.length > 0 && (
+                  <div className="rounded-xl border border-zinc-700/80 bg-zinc-950/50 p-3 md:col-span-2">
+                    <p className="mb-2 text-xs font-medium text-zinc-400">
+                      Efficient frontier (VADER-adjusted returns)
+                    </p>
+                    <div className="h-[240px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={frontierChart}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                          <XAxis
+                            dataKey="riskPct"
+                            stroke="#a1a1aa"
+                            label={{ value: "Risk %", position: "insideBottom", offset: -2 }}
+                          />
+                          <YAxis
+                            stroke="#a1a1aa"
+                            label={{ value: "Return %", angle: -90, position: "insideLeft" }}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: "#18181b",
+                              border: "1px solid #3f3f46",
+                              borderRadius: 8,
+                            }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="returnPct"
+                            stroke="#a78bfa"
+                            strokeWidth={2}
+                            dot={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+                {sentimentRows.length > 0 && (
+                  <div className="rounded-xl border border-zinc-700/80 bg-zinc-950/50 p-3 md:col-span-2">
+                    <p className="mb-2 text-xs font-medium text-zinc-400">News sentiment (VADER)</p>
+                    <div className="flex flex-wrap gap-2">
+                      {sentimentRows.map((row) => (
+                        <span
+                          key={row.ticker}
+                          className="rounded-lg bg-zinc-900 px-2 py-1 text-xs text-zinc-300"
+                        >
+                          {row.ticker}:{" "}
+                          <strong
+                            className={
+                              row.score >= 0 ? "text-emerald-300" : "text-red-300"
+                            }
+                          >
+                            {row.score.toFixed(3)}
+                          </strong>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="rounded-xl border border-zinc-700/80 bg-zinc-950/50 p-3 md:col-span-2">
                   <div className="flex flex-wrap items-center gap-3 text-sm">
                     <span className="rounded-lg bg-zinc-900 px-2 py-1 text-zinc-300">
@@ -357,6 +451,7 @@ export default function FinancePage() {
         </section>
       </div>
     </main>
+    </AuthGuard>
   );
 }
 

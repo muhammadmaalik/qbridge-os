@@ -47,3 +47,119 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
 }
+
+/* —— Quantum Bridge cyberdeck OS —— */
+.cyberdeck-root {
+  position: relative;
+}
+
+.cyberdeck-grid {
+  background-image:
+    linear-gradient(rgba(34, 211, 238, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 20%, transparent 75%);
+}
+
+.cyber-panel {
+  box-shadow:
+    inset 0 1px 0 rgba(34, 211, 238, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+.cyber-input {
+  border-radius: 0.5rem;
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  background: rgba(0, 0, 0, 0.55);
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: #e4e4e7;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.cyber-input:focus {
+  border-color: rgba(34, 211, 238, 0.55);
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.12);
+}
+
+.cyber-btn-primary {
+  border-radius: 0.5rem;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.22), rgba(6, 78, 59, 0.35));
+  padding: 0.65rem 1rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a7f3d0;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.cyber-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(52, 211, 153, 0.35), rgba(6, 95, 70, 0.45));
+  box-shadow: 0 0 24px rgba(52, 211, 153, 0.2);
+}
+
+.cyber-btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* CSS orbital fallback (when 3D cloud loading / idle) */
+.orbital-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  box-shadow: 0 0 30px rgba(34, 211, 238, 0.12);
+}
+
+.orbital-ring-a {
+  width: 220px;
+  height: 90px;
+  animation: orbit-spin 14s linear infinite;
+}
+
+.orbital-ring-b {
+  width: 160px;
+  height: 160px;
+  border-color: rgba(52, 211, 153, 0.3);
+  animation: orbit-spin 9s linear infinite reverse;
+}
+
+.orbital-core {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #34d399 0%, #022c22 70%);
+  box-shadow: 0 0 28px rgba(52, 211, 153, 0.65);
+  animation: core-pulse 2.4s ease-in-out infinite;
+}
+
+.molecule-pulse .orbital-core {
+  animation-duration: 1.1s;
+}
+
+@keyframes orbit-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes core-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.85;
+  }
+}

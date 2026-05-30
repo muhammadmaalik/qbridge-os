@@ -1,396 +1,482 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import MoleculeCloudPanel from "@/components/chemistry/MoleculeCloudPanel";
+import VqeEnergyChart from "@/components/chemistry/VqeEnergyChart";
 import {
-  API_BASE,
-  establishPqcSession,
-  moleculeRequestCanonical,
-  pqcSignMessage,
-  webSocketUrlForApi,
-} from "@/lib/pqcHandshake";
+  chemistryKvRows,
+  isRealVqeBackend,
+  MOLECULE_PRESETS,
+  type MoleculePreset,
+  type MoleculeSimResult,
+  nucleiForMolecule,
+  optimizerKvRows,
+  runMoleculeSync,
+  vqeHistoryPoints,
+} from "@/lib/chemistryApi";
+import { establishPqcSession } from "@/lib/pqcHandshake";
+import AuthGuard from "@/components/AuthGuard";
 
-const FRIENDLY_CHEM_ERROR =
-  "Simulation failed: Molecule too complex for current quantum quota or backend timeout.";
-
-type MoleculeOption = {
-  label: string;
-  value: string;
-  mode: "structure" | "smiles";
-};
-
-type MoleculeResult = {
-  energy?: number;
-  depth?: number;
-  qubits?: number;
-  backend?: string;
-  molecule?: string;
-  chemistry?: Record<string, unknown>;
-  warnings?: string[];
-};
-
-function mapChemistryError(msg: string): string {
-  const t = msg.toLowerCase();
-  if (
-    t.includes("could not resolve") ||
-    t.includes("invalid smiles") ||
-    t.includes("unsupported formula") ||
-    t.includes("pubchem")
-  ) {
-    return "Simulation failed: Unknown or invalid molecule input. Try a valid formula, name, or SMILES.";
-  }
-  if (
-    t.includes("max_qubits") ||
-    t.includes("qubits") ||
-    t.includes("active space") ||
-    t.includes("too complex")
-  ) {
-    return "Simulation failed: Molecule exceeds current qubit quota. Try a smaller molecule or reduce complexity.";
-  }
-  return FRIENDLY_CHEM_ERROR;
-}
-
-const MOLECULES: MoleculeOption[] = [
-  { label: "Hydrogen (H2)", value: "H2", mode: "structure" },
-  { label: "Lithium Hydride (LiH)", value: "LiH", mode: "structure" },
-  { label: "Water (H2O)", value: "H2O", mode: "structure" },
-  { label: "Ethane (C2H6)", value: "CC", mode: "smiles" },
-  { label: "Caffeine (C8H10N4O2)", value: "caffeine", mode: "structure" },
-];
-
-function extractDipoleMoment(result: MoleculeResult | null): string {
-  if (!result?.chemistry || typeof result.chemistry !== "object") return "N/A";
-  const c = result.chemistry as Record<string, unknown>;
-  const fromFields = c.dipole_moment ?? c.dipole ?? c.dipole_au ?? c.dipole_debye;
-  if (typeof fromFields === "number") return fromFields.toFixed(6);
-  if (typeof fromFields === "string" && fromFields.trim()) return fromFields;
-  return "N/A";
-}
-
-async function waitForChemistryResult(jobId: string, timeoutMs = 35000): Promise<MoleculeResult> {
-  const wsUrl = webSocketUrlForApi();
-  return await new Promise<MoleculeResult>((resolve, reject) => {
-    let done = false;
-    const ws = new WebSocket(wsUrl);
-
-    const timer = window.setTimeout(() => {
-      if (done) return;
-      done = true;
-      try {
-        ws.close();
-      } catch {
-        /* ignore */
-      }
-      reject(new Error("timeout"));
-    }, timeoutMs);
-
-    ws.onmessage = (event) => {
-      try {
-        const parsed = JSON.parse(String(event.data)) as {
-          type?: string;
-          job_id?: string;
-          message?: string;
-          data?: unknown;
-        };
-
-        if (parsed.type === "result" && parsed.job_id === jobId && parsed.data) {
-          if (done) return;
-          done = true;
-          window.clearTimeout(timer);
-          ws.close();
-          resolve(parsed.data as MoleculeResult);
-          return;
-        }
-        if (parsed.type === "error" && parsed.job_id === jobId) {
-          if (done) return;
-          done = true;
-          window.clearTimeout(timer);
-          ws.close();
-          reject(new Error(parsed.message || "simulation_failed"));
-        }
-      } catch {
-        /* ignore non-json frames */
-      }
-    };
-
-    ws.onerror = () => {
-      if (done) return;
-      done = true;
-      window.clearTimeout(timer);
-      reject(new Error("ws_error"));
-    };
-  });
+function DataTable({
+  title,
+  rows,
+  emptyMessage = "Run a simulation to populate this table.",
+}: {
+  title: string;
+  rows: { label: string; value: string }[];
+  emptyMessage?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div className="border-b border-gray-200 px-4 py-3">
+        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+      </div>
+      {rows.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-gray-500">{emptyMessage}</p>
+      ) : (
+        <table className="w-full text-left text-sm">
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.label} className="border-b border-gray-100 last:border-0">
+                <th className="w-[42%] px-4 py-2.5 font-medium text-gray-600">
+                  {row.label}
+                </th>
+                <td className="px-4 py-2.5 text-gray-900">{row.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
 }
 
 export default function ChemistryPage() {
-  const [selected, setSelected] = useState<MoleculeOption>(MOLECULES[0]);
+  const [selected, setSelected] = useState<MoleculePreset>(MOLECULE_PRESETS[0]);
   const [customMolecule, setCustomMolecule] = useState("");
+  const [chemMode, setChemMode] = useState<"single" | "dimer">("single");
+  const [smilesA, setSmilesA] = useState("C");
+  const [smilesB, setSmilesB] = useState("O");
+  const [distanceAngstrom, setDistanceAngstrom] = useState(2.0);
+  const [totalCharge, setTotalCharge] = useState(0);
+  const [maxQubits, setMaxQubits] = useState(12);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<MoleculeResult | null>(null);
-  const [engineLog, setEngineLog] = useState<Record<string, unknown> | null>(null);
+  const [result, setResult] = useState<MoleculeSimResult | null>(null);
+  const [fallbackMode, setFallbackMode] = useState(false);
+  const [pqcReady, setPqcReady] = useState(false);
 
-  const dipoleText = useMemo(() => extractDipoleMoment(result), [result]);
+  useEffect(() => {
+    let mounted = true;
+    establishPqcSession()
+      .then(() => {
+        if (mounted) setPqcReady(true);
+      })
+      .catch(() => {
+        if (mounted) setPqcReady(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const activeToken =
+    chemMode === "dimer"
+      ? `${smilesA.trim()} + ${smilesB.trim()}`
+      : customMolecule.trim() || selected.value;
+  const activeLabel =
+    chemMode === "dimer"
+      ? `Dimer (A+B)`
+      : customMolecule.trim()
+        ? customMolecule.trim()
+        : selected.label;
+
+  const chartData = useMemo(
+    () => vqeHistoryPoints(result?.vqe),
+    [result?.vqe]
+  );
+
+  const jwRows = useMemo(
+    () => chemistryKvRows(result?.chemistry),
+    [result?.chemistry]
+  );
+
+  const optRows = useMemo(() => optimizerKvRows(result), [result]);
+
+  const nuclei = useMemo(
+    () => nucleiForMolecule(activeToken, result, result?.cloud_data),
+    [activeToken, result]
+  );
+
+  const realVqe = result ? isRealVqeBackend(result.backend) : null;
 
   const runSimulation = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
-    setEngineLog(null);
+    setFallbackMode(false);
 
     try {
-      const session = await establishPqcSession();
       const useCustom = customMolecule.trim().length > 0;
-      const chosenMode = useCustom ? ("structure" as const) : selected.mode;
-      const chosenValue = useCustom ? customMolecule.trim() : selected.value;
+      const mode = useCustom ? ("smiles" as const) : selected.mode;
+      const value = useCustom ? customMolecule.trim() : selected.value;
+
+      if (chemMode === "dimer") {
+        const body: Record<string, unknown> = {
+          username: "testuser",
+          max_qubits: maxQubits,
+          hardware_provider: "local",
+          noise: false,
+          charge: totalCharge,
+          smiles_a: smilesA.trim(),
+          smiles_b: smilesB.trim(),
+          distance_angstrom: distanceAngstrom,
+        };
+        const sync = await runMoleculeSync(body);
+        setResult(sync.data);
+        setFallbackMode(Boolean(sync.engaged_simulator_fallback));
+        return;
+      }
 
       const body: Record<string, unknown> = {
         username: "testuser",
-        max_qubits: 28,
-        hardware_provider: "ibm",
+        max_qubits: maxQubits,
+        hardware_provider: "local",
         noise: false,
       };
-      if (chosenMode === "smiles") body.smiles = chosenValue;
-      else body.structure = chosenValue;
+      if (mode === "smiles") body.smiles = value;
+      else body.structure = value;
 
-      const canonical = moleculeRequestCanonical("testuser", {
-        structure: chosenMode === "structure" ? chosenValue : "",
-        smiles: chosenMode === "smiles" ? chosenValue : "",
-        hardwareProvider: "ibm",
-        maxQubits: 28,
-        scan: "",
-        noise: false,
-      });
-      const signature = await pqcSignMessage(session.sharedSecretHex, canonical);
-
-      const queueRes = await fetch(`${API_BASE}/api/v1/compute/molecule`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-QBridge-Session": session.sessionId,
-          "X-QBridge-Signature": signature,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!queueRes.ok) {
-        const detail = await queueRes.text();
-        setError(mapChemistryError(detail));
-        return;
-      }
-      const queueJson = (await queueRes.json()) as { job_id?: string };
-      if (!queueJson.job_id) {
-        setError(FRIENDLY_CHEM_ERROR);
-        return;
-      }
-
-      const r = await waitForChemistryResult(queueJson.job_id, 35000);
-      setResult(r);
-      setEngineLog({
-        hartree_fock_initial_state: "Reference determinant |1100...> (backend-internal HF seed)",
-        jordan_wigner_mapping: r.chemistry ?? null,
-        qubits_used: r.qubits ?? null,
-        optimizer_logs: {
-          backend: r.backend ?? null,
-          circuit_depth: r.depth ?? null,
-          warnings: r.warnings ?? [],
-        },
-      });
+      const sync = await runMoleculeSync(body);
+      setResult(sync.data);
+      setFallbackMode(Boolean(sync.engaged_simulator_fallback));
     } catch (e) {
-      setError(mapChemistryError(String(e)));
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-4 py-6 text-zinc-200 md:px-8">
-      <div className="mx-auto max-w-7xl">
-        <header className="mb-6 rounded-2xl border border-white/10 bg-zinc-900/40 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">
-                Quantum Chemistry Dashboard
-              </h1>
-              <p className="mt-1 text-sm text-zinc-400">
-                Biotech-lab inspired VQE interface for molecular simulation.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Link
-                href="/"
-                className="rounded-xl border border-zinc-700 bg-zinc-900/60 px-4 py-2 text-sm text-zinc-300 transition hover:border-blue-400/40 hover:text-blue-200"
-              >
-                Main Dashboard
-              </Link>
-              <Link
-                href="/finance"
-                className="rounded-xl border border-zinc-700 bg-zinc-900/60 px-4 py-2 text-sm text-zinc-300 transition hover:border-emerald-400/40 hover:text-emerald-200"
-              >
-                Quantum Finance
-              </Link>
-            </div>
+    <AuthGuard>
+    <div className="min-h-screen bg-gray-50 text-gray-900">
+      <header className="border-b border-gray-200 bg-white">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">
+              Quantum Chemistry
+            </h1>
+            <p className="mt-0.5 text-sm text-gray-600">
+              Variational quantum eigensolver · ground-state energy analysis
+            </p>
           </div>
-        </header>
+          <nav className="flex gap-2 text-sm">
+            <Link
+              href="/"
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/finance"
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+            >
+              Finance
+            </Link>
+            <Link
+              href="/security"
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+            >
+              Security
+            </Link>
+          </nav>
+        </div>
+      </header>
 
-        <section className="mb-6 grid gap-6 lg:grid-cols-12">
-          <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-5 backdrop-blur-xl lg:col-span-4">
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-300">
-              Molecule Selection Panel
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="mb-2 block text-xs font-medium text-zinc-400">
-                  Molecule Preset
-                </label>
-                <select
-                  value={`${selected.mode}:${selected.value}`}
-                  onChange={(e) => {
-                    const picked = MOLECULES.find(
-                      (m) => `${m.mode}:${m.value}` === e.target.value
-                    );
-                    if (picked) setSelected(picked);
-                  }}
-                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none transition focus:border-blue-400/50 focus:ring-2 focus:ring-blue-500/20"
-                >
-                  {MOLECULES.map((m) => (
-                    <option key={`${m.mode}:${m.value}`} value={`${m.mode}:${m.value}`}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <div className="grid gap-6 lg:grid-cols-12">
+          <aside className="lg:col-span-4">
+            <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-semibold text-gray-900">
+                Simulation controls
+              </h2>
 
-              <div>
-                <label className="mb-2 block text-xs font-medium text-zinc-400">
-                  Custom Molecule Input (formula/name/SMILES)
-                </label>
-                <input
-                  value={customMolecule}
-                  onChange={(e) => setCustomMolecule(e.target.value)}
-                  placeholder="e.g., C6H12O6, Aspirin, C1=CC=CC=C1"
-                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none transition focus:border-violet-400/50 focus:ring-2 focus:ring-violet-500/20"
-                />
-                <p className="mt-1 text-[11px] text-zinc-500">
-                  If provided, custom input overrides the preset dropdown.
-                </p>
-              </div>
-
-              <button
-                onClick={runSimulation}
-                disabled={loading}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-violet-400/30 bg-violet-500/15 px-4 py-2.5 text-sm font-semibold text-violet-200 transition hover:bg-violet-500/25 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {loading && (
-                  <svg
-                    className="h-4 w-4 animate-spin text-violet-300"
-                    viewBox="0 0 24 24"
-                    fill="none"
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Input mode
+                  </label>
+                  <select
+                    value={chemMode}
+                    onChange={(e) =>
+                      setChemMode(e.target.value as "single" | "dimer")
+                    }
+                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
-                    <circle
-                      cx="12"
-                      cy="12"
-                      r="9"
-                      className="opacity-25"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                    />
-                    <path
-                      d="M21 12a9 9 0 0 1-9 9"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                )}
-                {loading
-                  ? "Fetching 3D geometry & computing quantum state..."
-                  : "Run VQE Chemistry Simulation"}
-              </button>
+                    <option value="single">Single molecule</option>
+                    <option value="dimer">Dimer (A + B)</option>
+                  </select>
+                </div>
 
-              {error && (
-                <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">
-                  {error}
-                </p>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Molecule preset
+                  </label>
+                  <select
+                    value={`${selected.mode}:${selected.value}`}
+                    onChange={(e) => {
+                      const picked = MOLECULE_PRESETS.find(
+                        (m) => `${m.mode}:${m.value}` === e.target.value
+                      );
+                      if (picked) setSelected(picked);
+                    }}
+                    disabled={chemMode === "dimer"}
+                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    {MOLECULE_PRESETS.map((m) => (
+                      <option
+                        key={`${m.mode}:${m.value}`}
+                        value={`${m.mode}:${m.value}`}
+                      >
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Custom molecule
+                  </label>
+                  <input
+                    value={customMolecule}
+                    onChange={(e) => setCustomMolecule(e.target.value)}
+                    placeholder="Formula, name, or SMILES"
+                    disabled={chemMode === "dimer"}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Overrides the preset when filled in.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Max qubits (statevector budget)
+                  </label>
+                  <input
+                    type="number"
+                    value={maxQubits}
+                    step={1}
+                    min={4}
+                    max={28}
+                    onChange={(e) =>
+                      setMaxQubits(
+                        Math.max(
+                          4,
+                          Math.min(28, Number(e.target.value) || 4)
+                        )
+                      )
+                    }
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Higher means exponentially slower simulation.
+                  </p>
+                </div>
+
+                {chemMode === "dimer" && (
+                  <>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                        Dimer SMILES A
+                      </label>
+                      <input
+                        value={smilesA}
+                        onChange={(e) => setSmilesA(e.target.value)}
+                        placeholder="e.g. CC, O, C1=CC=CC=C1 ..."
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                        Dimer SMILES B
+                      </label>
+                      <input
+                        value={smilesB}
+                        onChange={(e) => setSmilesB(e.target.value)}
+                        placeholder="e.g. O, NCC, C(=O)O ..."
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                          Separation (Angstrom)
+                        </label>
+                        <input
+                          type="number"
+                          value={distanceAngstrom}
+                          step={0.1}
+                          onChange={(e) =>
+                            setDistanceAngstrom(
+                              Number(e.target.value) || 0
+                            )
+                          }
+                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                          Total charge
+                        </label>
+                        <input
+                          type="number"
+                          value={totalCharge}
+                          step={1}
+                          onChange={(e) =>
+                            setTotalCharge(
+                              Number.parseInt(e.target.value || "0", 10)
+                            )
+                          }
+                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={runSimulation}
+                  disabled={loading || !pqcReady}
+                  className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading
+                    ? "Running simulation…"
+                    : !pqcReady
+                      ? "Connecting secure session…"
+                      : "Run VQE simulation"}
+                </button>
+
+                {!pqcReady && !loading && (
+                  <p className="text-xs text-amber-700">
+                    Establishing PQC session with the API…
+                  </p>
+                )}
+
+                {error && (
+                  <div
+                    role="alert"
+                    className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+                  >
+                    {error}
+                  </div>
+                )}
+              </div>
+
+              {result && (
+                <dl className="mt-6 space-y-2 border-t border-gray-200 pt-4 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-gray-600">Ground state energy</dt>
+                    <dd className="font-medium tabular-nums text-gray-900">
+                      {typeof result.energy === "number"
+                        ? `${result.energy.toFixed(6)} Ha`
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-gray-600">Molecule</dt>
+                    <dd className="text-gray-900">{result.molecule ?? activeLabel}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-gray-600">Backend</dt>
+                    <dd className="text-gray-900">
+                      {result.backend ?? "—"}
+                      {realVqe === false && (
+                        <span className="ml-1 text-xs text-amber-700">
+                          (catalog fallback — install qiskit-nature)
+                        </span>
+                      )}
+                      {realVqe === true && (
+                        <span className="ml-1 text-xs text-emerald-700">
+                          (live VQE)
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
               )}
             </div>
-          </div>
+          </aside>
 
-          <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-5 backdrop-blur-xl lg:col-span-8">
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-violet-300">
-              Visual Dashboard
-            </h2>
-
-            <div className="grid gap-5 md:grid-cols-2">
-              <div className="rounded-xl border border-zinc-700/80 bg-zinc-950/50 p-5">
-                <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-                  Calculated Ground State Energy
-                </p>
-                <p className="mt-4 text-3xl font-semibold tracking-tight text-cyan-300">
-                  {typeof result?.energy === "number" ? result.energy.toFixed(6) : "--"}
-                </p>
-                <p className="mt-1 text-xs text-zinc-500">Hartree</p>
+          <div className="space-y-6 lg:col-span-8">
+            {result && realVqe === false && (
+              <div
+                role="status"
+                className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+              >
+                The full chemistry stack is unavailable on the server, so this run used
+                a deterministic catalog fallback instead of Jordan–Wigner + SLSQP VQE.
+                Install backend deps (<code className="text-xs">qiskit-nature</code>,{" "}
+                <code className="text-xs">scipy</code>) and restart the API for real
+                quantum simulation.
               </div>
+            )}
 
-              <div className="rounded-xl border border-zinc-700/80 bg-zinc-950/50 p-5">
-                <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-                  Dipole Moment
-                </p>
-                <p className="mt-4 text-3xl font-semibold tracking-tight text-violet-300">
-                  {dipoleText}
-                </p>
-                <p className="mt-1 text-xs text-zinc-500">Debye / backend units</p>
-              </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <h2 className="mb-3 text-sm font-semibold text-gray-900">
+                  Electron density (3D)
+                </h2>
+                <MoleculeCloudPanel
+                  cloudData={result?.cloud_data}
+                  nuclei={nuclei}
+                  moleculeLabel={result?.molecule ?? activeLabel}
+                  loading={loading}
+                />
+                {result?.qubits != null && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Mapped qubits: {result.qubits}
+                  </p>
+                )}
+              </section>
+
+              <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <h2 className="mb-3 text-sm font-semibold text-gray-900">
+                  VQE energy convergence
+                </h2>
+                <VqeEnergyChart data={chartData} groundState={result?.energy} />
+                {result?.energy != null && chartData.length > 0 && (
+                  <p className="mt-2 text-center text-xs text-gray-500">
+                    Converged to {result.energy.toFixed(6)} Ha over{" "}
+                    {chartData.length} iterations
+                  </p>
+                )}
+              </section>
             </div>
-          </div>
-        </section>
 
-        <section className="rounded-2xl border border-white/10 bg-zinc-900/40 p-5 backdrop-blur-xl">
-          <details className="group" open>
-            <summary className="cursor-pointer list-none text-sm font-semibold uppercase tracking-wider text-blue-300">
-              VQE Quantum Engine Logs
-              <span className="ml-2 text-zinc-500 group-open:hidden">(expand)</span>
-            </summary>
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              <div className="rounded-xl border border-zinc-700/80 bg-zinc-950/55 p-3">
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                  Hartree-Fock Initial State
-                </h3>
-                <pre className="custom-scrollbar max-h-[260px] overflow-auto rounded-lg bg-black/30 p-3 text-[11px] text-zinc-300">
-{JSON.stringify(engineLog?.hartree_fock_initial_state ?? null, null, 2)}
-                </pre>
-              </div>
-
-              <div className="rounded-xl border border-zinc-700/80 bg-zinc-950/55 p-3">
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                  Jordan-Wigner Mapping Data
-                </h3>
-                <pre className="custom-scrollbar max-h-[260px] overflow-auto rounded-lg bg-black/30 p-3 text-[11px] text-zinc-300">
-{JSON.stringify(engineLog?.jordan_wigner_mapping ?? null, null, 2)}
-                </pre>
-              </div>
-
-              <div className="rounded-xl border border-zinc-700/80 bg-zinc-950/55 p-3 lg:col-span-2">
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                  Qubits + Optimizer Logs
-                </h3>
-                <pre className="custom-scrollbar max-h-[320px] overflow-auto rounded-lg bg-black/30 p-3 text-[11px] text-zinc-300">
-{JSON.stringify(
-  {
-    qubits_used: engineLog?.qubits_used ?? null,
-    optimizer_logs: engineLog?.optimizer_logs ?? null,
-    molecule: result?.molecule ?? selected.label,
-  },
-  null,
-  2
-)}
-                </pre>
-              </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              <DataTable title="Jordan–Wigner mapping" rows={jwRows} />
+              <DataTable title="Optimizer & qubit telemetry" rows={optRows} />
             </div>
-          </details>
-        </section>
-      </div>
-    </main>
+
+            {result?.result && (
+              <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Result summary
+                </p>
+                <p className="mt-1 text-sm text-gray-800">{result.result}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+    </AuthGuard>
   );
 }
-

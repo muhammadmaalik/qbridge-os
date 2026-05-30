@@ -1,7 +1,9 @@
 import httpx
 import asyncio
 import os
+from typing import Any
 import numpy as np
+from scipy.optimize import minimize as _scipy_minimize
 from qiskit import QuantumCircuit
 from qiskit.circuit.library import RealAmplitudes
 from qiskit.quantum_info import SparsePauliOp, Statevector
@@ -11,6 +13,7 @@ from backend.chemistry_mapper import (
     build_qubit_operator_from_chemical_input,
     build_qubit_operator_from_molecule_info,
     molecule_with_first_bond_length,
+    resolve_dimer_geometry,
     resolve_molecule_geometry,
 )
 from backend.telemetry import set_noise_telemetry
@@ -41,6 +44,95 @@ def _prepare_estimator_hamiltonian(obs) -> SparsePauliOp:
     return obs.chop(1e-8)
 
 
+def run_local_vqe_slsqp(
+    observable: SparsePauliOp,
+    *,
+    maxiter: int = 50,
+    reps: int = 1,
+    entanglement: str = "linear",
+    initial_point: np.ndarray | None = None,
+    rng_seed: int = 1234,
+    ftol: float = 1e-6,
+) -> dict[str, Any]:
+    """
+    Real Variational Quantum Eigensolver on a local CPU statevector simulator.
+
+    This is the actual minimization loop: a :class:`RealAmplitudes` ansatz is
+    optimized with SciPy's SLSQP against the exact ⟨H⟩ on the statevector.
+    The function is fully synchronous (cheap on small qubit counts; ~1ms per
+    energy eval at 4–8 qubits) so it can be called directly from sync contexts
+    or wrapped in :func:`asyncio.to_thread` from async ones.
+
+    Returns a dict with the optimal energy, the bound circuit at the optimum,
+    iteration counters, and SciPy's convergence ``success``/``message`` so the
+    caller can surface early bailout (e.g. ``maxiter=50`` exhausted before
+    SLSQP's tolerance was met).
+    """
+    obs = _prepare_estimator_hamiltonian(observable)
+    nq = int(obs.num_qubits)
+    if nq < 1:
+        raise ValueError("observable must act on at least one qubit")
+
+    ansatz = RealAmplitudes(
+        num_qubits=nq,
+        reps=int(reps),
+        entanglement=str(entanglement),
+        insert_barriers=False,
+    )
+    n_params = int(ansatz.num_parameters)
+
+    if initial_point is None:
+        rng = np.random.default_rng(int(rng_seed))
+        x0 = np.full(n_params, np.pi / 5.0) + rng.normal(0.0, 0.05, size=n_params)
+    else:
+        x0 = np.asarray(initial_point, dtype=float).reshape(-1)
+        if x0.shape[0] != n_params:
+            raise ValueError(
+                f"initial_point length {x0.shape[0]} != ansatz parameter count {n_params}"
+            )
+
+    history: list[float] = []
+
+    def energy_fn(params: np.ndarray) -> float:
+        bound = ansatz.assign_parameters(np.asarray(params, dtype=float))
+        e = _expectation_sparse_pauli_statevector(bound, obs)
+        history.append(e)
+        return e
+
+    res = _scipy_minimize(
+        energy_fn,
+        x0,
+        method="SLSQP",
+        options={"maxiter": int(maxiter), "ftol": float(ftol), "disp": False},
+    )
+
+    final_params = np.asarray(res.x, dtype=float)
+    final_energy = float(np.real(res.fun))
+    optimal_qc = ansatz.assign_parameters(final_params)
+
+    return {
+        "energy": final_energy,
+        "circuit": optimal_qc,
+        "optimal_params": [float(x) for x in final_params],
+        "n_iterations": int(getattr(res, "nit", 0)),
+        "n_function_evals": int(getattr(res, "nfev", len(history))),
+        "converged": bool(getattr(res, "success", False)),
+        "convergence_message": str(getattr(res, "message", "")),
+        "scipy_status": int(getattr(res, "status", -1)),
+        "optimizer": "SLSQP",
+        "maxiter": int(maxiter),
+        "ftol": float(ftol),
+        "ansatz": "RealAmplitudes",
+        "reps": int(reps),
+        "entanglement": str(entanglement),
+        "num_qubits": nq,
+        "num_parameters": n_params,
+        "history_tail": [float(x) for x in history[-5:]],
+        "energy_history": [float(x) for x in history],
+        "backend": "local_statevector_simulator",
+    }
+
+
 def _scalar_energy_float(val) -> float:
     """Coerce estimator output to a Python float (handles 0-d arrays and scalars)."""
     arr = np.asarray(val, dtype=np.float64)
@@ -49,31 +141,71 @@ def _scalar_energy_float(val) -> float:
     return float(arr.ravel()[0])
 
 
-def _ibm_token_usable(token: str | None) -> bool:
-    if token is None:
-        return False
-    s = str(token).strip()
-    return bool(s) and s != "local_fallback"
+def _public_vqe_meta(meta: dict[str, Any]) -> dict[str, Any]:
+    """JSON-safe view of :func:`run_local_vqe_slsqp` output (drops the live circuit)."""
+    if not meta:
+        return {}
+    return {k: v for k, v in meta.items() if k != "circuit"}
+
+
+def run_local_noisy_expectation(
+    observable: SparsePauliOp,
+    circuit: QuantumCircuit,
+    *,
+    shots: int = 4096,
+    fake_device: object | None = None,
+    profile_label: str | None = None,
+) -> dict[str, Any]:
+    """
+    One-shot noisy ⟨H⟩ on the VQE-optimal circuit.
+
+    This is the post-VQE "what would this look like on hardware" pass. It runs
+    :class:`qiskit_aer.primitives.estimator.Estimator` (V1, the only Aer
+    primitive that doesn't trip the EstimatorV2 SparseObservable / Hermitian
+    coercion) with a :class:`NoiseModel.from_backend(fake)` derived from a
+    local IBM fake provider — no network, no qiskit_ibm_runtime service call.
+
+    The optimization itself stays on the exact statevector path (see
+    :func:`run_local_vqe_slsqp`); this function only re-evaluates the energy
+    of the *already-optimal* circuit under simulated hardware noise so the UI
+    can show a clean-vs-noisy comparison without destabilizing SLSQP.
+    """
+    from qiskit_aer.noise import NoiseModel
+    from qiskit_aer.primitives.estimator import Estimator as AerEstimatorV1
+
+    if fake_device is None or not profile_label:
+        fake_device, profile_label = _resolve_fake_device_for_noise()
+
+    obs = _prepare_estimator_hamiltonian(observable)
+    noise_model = NoiseModel.from_backend(fake_device)
+    estimator = AerEstimatorV1(
+        backend_options={"noise_model": noise_model},
+        run_options={"shots": int(shots)},
+        approximation=False,
+    )
+
+    job = estimator.run([circuit], [obs], parameter_values=[[]])
+    result = job.result()
+    noisy_energy = _scalar_energy_float(result.values)
+
+    return {
+        "noisy_energy": noisy_energy,
+        "noise_profile": profile_label,
+        "shots": int(shots),
+        "fake_device": type(fake_device).__name__,
+        "estimator": "qiskit_aer.primitives.Estimator (V1)",
+        "noise_source": "NoiseModel.from_backend",
+    }
 
 
 def _resolve_fake_device_for_noise() -> tuple[object, str]:
-    """IBM Runtime fake backend → :class:`NoiseModel.from_backend` source."""
+    """Pick a local IBM fake backend (no network) to seed :class:`NoiseModel.from_backend`."""
     name = os.environ.get("QBRIDGE_NOISE_PROFILE", "ibm_osaka").strip().lower()
     from qiskit_ibm_runtime.fake_provider import FakeKyiv, FakeOsaka
 
     if name in ("ibm_kyiv", "kyiv", "fake_kyiv"):
         return FakeKyiv(), "ibm_kyiv"
     return FakeOsaka(), "ibm_osaka"
-
-
-def _average_readout_e3(fake) -> float | None:
-    try:
-        p = fake.properties()
-        n = min(int(p.num_qubits), 32)
-        errs = [p.readout_error(i) for i in range(n)]
-        return round(sum(errs) / len(errs) * 1000.0, 2) if errs else None
-    except Exception:
-        return None
 
 
 def _parse_scan_distances(spec: str) -> list[float]:
@@ -151,12 +283,10 @@ def build_electron_probability_cloud(
     return cloud
 
 
-from qiskit_ibm_runtime import QiskitRuntimeService
-
-try:
-    from qiskit_ibm_runtime import EstimatorV2 as RuntimeEstimator
-except ImportError:
-    from qiskit_ibm_runtime import Estimator as RuntimeEstimator
+# NOTE: qiskit_ibm_runtime is intentionally NOT imported at the top level.
+# The VQE solver runs strictly on local CPU (qiskit statevector). IBM Runtime
+# routing was removed because remote dispatch was masking real bugs as
+# "circuit too complex" rejections in this environment.
 
 
 class QuantumRouter:
@@ -182,132 +312,129 @@ class QuantumRouter:
         self,
         observable,
         *,
-        hw: str,
-        api_key: str,
-        use_noise: bool = False,
-        fake_device: object | None = None,
-        noise_profile: str | None = None,
-    ) -> tuple[float, str, QuantumCircuit]:
-        observable = _prepare_estimator_hamiltonian(observable)
-        nq = observable.num_qubits
-        reps = 1 if nq <= 8 else 1
-        ansatz = RealAmplitudes(
-            num_qubits=nq,
+        maxiter: int = 50,
+        reps: int = 1,
+        entanglement: str = "linear",
+        initial_point: np.ndarray | None = None,
+        rng_seed: int = 1234,
+    ) -> tuple[float, str, QuantumCircuit, dict[str, Any]]:
+        """
+        Real local SLSQP-driven VQE on exact statevector (no IBM Runtime, no GPU).
+
+        Returns ``(energy, backend_name, optimal_circuit, vqe_meta)``. The
+        ``vqe_meta`` dict carries the SLSQP convergence flag and message so the
+        frontend can detect early bailout. Noise is *not* applied here — see
+        :meth:`_run_noisy_expectation` for the post-VQE noisy pass.
+        """
+        meta = await asyncio.to_thread(
+            run_local_vqe_slsqp,
+            observable,
+            maxiter=maxiter,
             reps=reps,
-            entanglement="linear",
-            insert_barriers=False,
+            entanglement=entanglement,
+            initial_point=initial_point,
+            rng_seed=rng_seed,
         )
-        rng = np.full(ansatz.num_parameters, np.pi / 5.0)
-        qc = ansatz.assign_parameters(rng)
+        return (
+            float(meta["energy"]),
+            str(meta["backend"]),
+            meta["circuit"],
+            meta,
+        )
 
-        async def _run_local_exact():
-            def run_local():
-                return _expectation_sparse_pauli_statevector(qc, observable)
-
-            energy = await asyncio.to_thread(run_local)
-            return energy, "local_statevector_exact"
-
-        async def _run_local_noisy(profile_label: str, fake) -> tuple[float, str]:
-            # BackendEstimatorV2 / Estimator V2 coerce to SparseObservable and can raise Non-Hermitian
-            # on simplify. Use qiskit-aer's BaseEstimatorV1 implementation (explicit submodule).
-            from qiskit_aer.noise import NoiseModel
-            from qiskit_aer.primitives.estimator import Estimator as AerEstimatorV1
-
-            noise_model = NoiseModel.from_backend(fake)
-            estimator = AerEstimatorV1(
-                backend_options={"noise_model": noise_model},
-                approximation=False,
-            )
-
-            def run_noisy():
-                job = estimator.run([qc], [observable], parameter_values=[[]])
-                return job.result()
-
-            result = await asyncio.to_thread(run_noisy)
-            return _scalar_energy_float(result.values), f"aer_noise_{profile_label}"
-
-        async def _run_local():
-            if use_noise:
-                self._last_run_used_aer_noise = True
-                fake = fake_device
-                prof = noise_profile
-                if fake is None or not prof:
-                    fake, prof = _resolve_fake_device_for_noise()
-                return await _run_local_noisy(prof, fake)
-            self._last_run_used_aer_noise = False
-            return await _run_local_exact()
-
-        if hw in ("local", "anu"):
-            energy, backend_used = await _run_local()
-            return energy, backend_used, qc
-
-        if hw == "ibm":
-            try:
-                service = QiskitRuntimeService(channel="ibm_quantum", token=api_key)
-                try:
-                    backend = service.least_busy(simulator=False, operational=True)
-                except Exception:
-                    backend = service.least_busy(simulator=True, operational=True)
-                estimator = RuntimeEstimator(backend=backend)
-
-                def run_job():
-                    if RuntimeEstimator.__name__ == "EstimatorV2":
-                        job = estimator.run([(qc, observable)])
-                    else:
-                        job = estimator.run([qc], [observable])
-                    return job.result()
-
-                result = await asyncio.to_thread(run_job)
-
-                if RuntimeEstimator.__name__ == "EstimatorV2":
-                    evs = result[0].data.evs
-                    energy = _scalar_energy_float(evs)
-                else:
-                    energy = _scalar_energy_float(result.values)
-
-                return energy, backend.name, qc
-
-            except Exception as e:
-                print(f"IBM Quantum failed, falling back to local simulator: {e}")
-                energy, backend_used = await _run_local()
-                return energy, backend_used, qc
-
-        energy, backend_used = await _run_local()
-        return energy, backend_used, qc
+    async def _run_noisy_expectation(
+        self,
+        observable: SparsePauliOp,
+        circuit: QuantumCircuit,
+        *,
+        shots: int = 4096,
+        fake_device: object | None = None,
+        profile_label: str | None = None,
+    ) -> dict[str, Any]:
+        """Async wrapper for :func:`run_local_noisy_expectation`."""
+        return await asyncio.to_thread(
+            run_local_noisy_expectation,
+            observable,
+            circuit,
+            shots=shots,
+            fake_device=fake_device,
+            profile_label=profile_label,
+        )
 
     async def simulate_molecule(self, api_key: str, payload: dict) -> dict:
-        """Electronic Hamiltonian (JW) + hardware-aware active space + Estimator; optional PES scan."""
+        """Local CPU VQE pipeline. Never returns catalog/simulated energies."""
+        return await self._simulate_molecule_pipeline(api_key, payload)
+
+    async def _simulate_molecule_pipeline(self, api_key: str, payload: dict) -> dict:
+        """
+        ElectronicStructureProblem → ActiveSpaceTransformer → ParityMapper → SLSQP VQE.
+        Optional PES scan over the first internuclear vector.
+        """
         self._last_run_used_aer_noise = False
         structure = payload.get("structure")
         smiles = payload.get("smiles")
-        max_qubits = int(payload.get("max_qubits") or os.environ.get("QBRIDGE_MAX_QUBITS") or 28)
+        charge = int(payload.get("charge") or 0)
+        smiles_a = payload.get("smiles_a")
+        smiles_b = payload.get("smiles_b")
+        distance_angstrom = float(payload.get("distance_angstrom") or 2.0)
+        dimer_mode = bool(smiles_a and str(smiles_a).strip()) and bool(smiles_b and str(smiles_b).strip())
+        max_qubits = int(payload.get("max_qubits") or os.environ.get("QBRIDGE_MAX_QUBITS") or 12)
+        vqe_maxiter = int(payload.get("vqe_maxiter") or 50)
         req_hw = payload.get("_requested_hardware_provider") or payload.get(
             "hardware_provider"
         )
-        req_hw = str(req_hw or "ibm").strip().lower()
-        hw = (payload.get("hardware_provider") or "ibm").strip().lower()
+        req_hw = str(req_hw or "local").strip().lower()
+        # IBM Runtime / GPU are intentionally disabled on this VQE pipeline.
+        # ``hw`` is retained only to gate the optional ANU-entropy decoration.
+        hw = "anu" if req_hw == "anu" else "local"
         scan_raw = payload.get("scan")
         use_noise = bool(payload.get("noise"))
+        warnings: list[str] = []
+
+        if req_hw == "ibm":
+            warnings.append(
+                "[hardware] IBM Runtime routing is disabled in this build; "
+                "running the VQE locally on CPU statevector."
+            )
+
+        # Noise is applied as a *post-VQE* one-shot ⟨H⟩ pass on the optimal
+        # circuit, never inside the SLSQP loop (shot noise breaks gradients).
+        noise_shots = int(payload.get("noise_shots") or 4096)
         fake_for_noise: object | None = None
         noise_prof: str | None = None
         if use_noise:
             fake_for_noise, noise_prof = _resolve_fake_device_for_noise()
-        warnings: list[str] = []
-
-        if req_hw == "ibm" and not _ibm_token_usable(api_key):
-            if not payload.get("_ibm_endpoint_warned"):
-                warnings.append(
-                    "[hardware] IBM Key missing. Engaging Local Qiskit Aer Simulator (Reference: FakeOsaka)..."
-                )
-            hw = "local"
 
         chem_meta: dict
         label: str
 
-        if scan_raw and str(scan_raw).strip():
+        if dimer_mode:
+            if scan_raw and str(scan_raw).strip():
+                raise ValueError("scan is not supported for dimer mode (smiles_a/smiles_b).")
+
+            dimer_mi, geo_meta = resolve_dimer_geometry(
+                smiles_a=str(smiles_a).strip(),
+                smiles_b=str(smiles_b).strip(),
+                distance_angstrom=distance_angstrom,
+                charge=charge,
+            )
+            # Build qubit operator from explicit combined geometry.
+            observable, molecule_info, chem_meta = build_qubit_operator_from_molecule_info(
+                dimer_mi,
+                max_qubits=max_qubits,
+                meta_extra=geo_meta,
+                mapper_kind="jordan_wigner",
+            )
+            label = str(chem_meta.get("display_label") or "dimer")
+
+            energy, backend_used, qc, vqe_meta = await self._run_vqe_energy(
+                observable,
+                maxiter=vqe_maxiter,
+            )
+        elif scan_raw and str(scan_raw).strip():
             distances = _parse_scan_distances(str(scan_raw))
             base_mi, geo_meta = resolve_molecule_geometry(
-                structure=structure, smiles=smiles, charge=0
+                structure=structure, smiles=smiles, charge=charge
             )
             if len(base_mi.symbols) < 2:
                 raise ValueError("PES scan requires at least two atoms (e.g. H2 or LiH).")
@@ -326,6 +453,10 @@ class QuantumRouter:
             last_backend = "local_statevector_simulator"
             chem_meta = {**geo_meta, "scan_spec": str(scan_raw).strip()}
 
+            best_vqe_meta: dict[str, Any] = {}
+            best_observable: SparsePauliOp | None = None
+            any_bailout = False
+
             for i, r in enumerate(distances):
                 mi_r = molecule_with_first_bond_length(base_mi, r)
                 observable, molecule_info, pt_meta = build_qubit_operator_from_molecule_info(
@@ -336,22 +467,30 @@ class QuantumRouter:
                         "scan_distance_angstrom": r,
                         "scan_point_index": i,
                     },
+                    mapper_kind="jordan_wigner",
                 )
-                energy, backend_used, qc = await self._run_vqe_energy(
+                energy, backend_used, qc, vqe_meta = await self._run_vqe_energy(
                     observable,
-                    hw=hw,
-                    api_key=api_key,
-                    use_noise=use_noise,
-                    fake_device=fake_for_noise,
-                    noise_profile=noise_prof,
+                    maxiter=vqe_maxiter,
                 )
-                scan_curve.append({"distance": float(r), "energy": float(energy)})
+                if not vqe_meta.get("converged", False):
+                    any_bailout = True
+                scan_curve.append(
+                    {
+                        "distance": float(r),
+                        "energy": float(energy),
+                        "converged": bool(vqe_meta.get("converged", False)),
+                        "n_iterations": int(vqe_meta.get("n_iterations", 0)),
+                    }
+                )
                 if energy < best_energy:
                     best_energy = energy
                     best_i = i
                     last_qc = qc
                     last_mi = molecule_info
                     last_backend = backend_used
+                    best_vqe_meta = vqe_meta
+                    best_observable = observable
                 chem_meta = {**chem_meta, **pt_meta, "scan_points_computed": i + 1}
 
             assert last_qc is not None
@@ -359,17 +498,44 @@ class QuantumRouter:
                 seed = await self.fetch_anu_entropy()
                 chem_meta = {**chem_meta, "anu_entropy_preview": seed[:16]}
 
+            # Single noisy pass on the lowest-energy PES point only; running it
+            # on every scan point would multiply latency for no extra UX value.
+            noisy_meta: dict[str, Any] | None = None
+            if use_noise and best_observable is not None:
+                try:
+                    noisy_meta = await self._run_noisy_expectation(
+                        best_observable,
+                        last_qc,
+                        shots=noise_shots,
+                        fake_device=fake_for_noise,
+                        profile_label=noise_prof,
+                    )
+                    self._last_run_used_aer_noise = True
+                except Exception as e:
+                    warnings.append(f"[noise] noisy ⟨H⟩ pass failed: {e!r}")
+
+            chem_meta["nuclei_coords"] = [
+                [float(c[0]), float(c[1]), float(c[2])] for c in last_mi.coords
+            ]
+            chem_meta["atomic_symbols"] = [str(s) for s in last_mi.symbols]
+
             cloud_data = build_electron_probability_cloud(last_qc, last_mi)
-            if use_noise and self._last_run_used_aer_noise and fake_for_noise is not None:
+            if noisy_meta is not None:
                 set_noise_telemetry(
                     active=True,
                     profile=noise_prof,
                     level="simulated-device",
-                    readout_error_e3=_average_readout_e3(fake_for_noise),
+                    readout_error_e3=None,
                     gate_error_e3=None,
                 )
             else:
                 set_noise_telemetry(active=False, level="off", profile=None)
+
+            if any_bailout:
+                warnings.append(
+                    "[vqe] one or more PES points hit SLSQP maxiter without "
+                    "converging; treat those energies as upper bounds."
+                )
 
             return {
                 "result": f"PES scan: {len(scan_curve)} points; min energy = {best_energy:.4f} Ha at r = {scan_curve[best_i]['distance']} Å",
@@ -385,42 +551,73 @@ class QuantumRouter:
                 "chemistry": chem_meta,
                 "is_scan": True,
                 "scan_curve": scan_curve,
+                "vqe": _public_vqe_meta(best_vqe_meta),
+                "noisy_pass": noisy_meta,
                 "warnings": warnings,
-                "noise_active": bool(use_noise and self._last_run_used_aer_noise),
-                "noise_profile": noise_prof if use_noise else None,
+                "noise_active": noisy_meta is not None,
+                "noise_profile": noise_prof if noisy_meta is not None else None,
             }
 
-        observable, molecule_info, chem_meta = build_qubit_operator_from_chemical_input(
-            structure=structure,
-            smiles=smiles,
-            max_qubits=max_qubits,
-        )
-        label = str(chem_meta.get("display_label") or structure or smiles or "unknown")
+        if not dimer_mode:
+            observable, molecule_info, chem_meta = build_qubit_operator_from_chemical_input(
+                structure=structure,
+                smiles=smiles,
+                max_qubits=max_qubits,
+                charge=charge,
+                mapper_kind="jordan_wigner",
+            )
+            label = str(
+                chem_meta.get("display_label") or structure or smiles or "unknown"
+            )
 
-        energy, backend_used, qc = await self._run_vqe_energy(
-            observable,
-            hw=hw,
-            api_key=api_key,
-            use_noise=use_noise,
-            fake_device=fake_for_noise,
-            noise_profile=noise_prof,
-        )
+            energy, backend_used, qc, vqe_meta = await self._run_vqe_energy(
+                observable,
+                maxiter=vqe_maxiter,
+            )
+
         if hw == "anu":
             seed = await self.fetch_anu_entropy()
             chem_meta = {**chem_meta, "anu_entropy_preview": seed[:16]}
 
-        cloud_data = build_electron_probability_cloud(qc, molecule_info)
+        # Post-VQE noisy ⟨H⟩ pass on the optimal circuit (does not affect SLSQP).
+        noisy_meta: dict[str, Any] | None = None
+        if use_noise:
+            try:
+                noisy_meta = await self._run_noisy_expectation(
+                    observable,
+                    qc,
+                    shots=noise_shots,
+                    fake_device=fake_for_noise,
+                    profile_label=noise_prof,
+                )
+                self._last_run_used_aer_noise = True
+            except Exception as e:
+                warnings.append(f"[noise] noisy ⟨H⟩ pass failed: {e!r}")
 
-        if use_noise and self._last_run_used_aer_noise and fake_for_noise is not None:
+        chem_meta["nuclei_coords"] = [
+            [float(c[0]), float(c[1]), float(c[2])] for c in molecule_info.coords
+        ]
+        chem_meta["atomic_symbols"] = [str(s) for s in molecule_info.symbols]
+
+        cloud_data = build_electron_probability_cloud(qc, molecule_info)
+        if noisy_meta is not None:
             set_noise_telemetry(
                 active=True,
                 profile=noise_prof,
                 level="simulated-device",
-                readout_error_e3=_average_readout_e3(fake_for_noise),
+                readout_error_e3=None,
                 gate_error_e3=None,
             )
         else:
             set_noise_telemetry(active=False, level="off", profile=None)
+
+        if not vqe_meta.get("converged", False):
+            warnings.append(
+                f"[vqe] SLSQP did not report success "
+                f"(message='{vqe_meta.get('convergence_message')}', "
+                f"maxiter={vqe_meta.get('maxiter')}); "
+                "treat the energy as an upper bound on the true ground state."
+            )
 
         return {
             "result": f"Energy = {energy:.4f} Hartree",
@@ -435,9 +632,11 @@ class QuantumRouter:
             "cloud_data": cloud_data,
             "chemistry": chem_meta,
             "is_scan": False,
+            "vqe": _public_vqe_meta(vqe_meta),
+            "noisy_pass": noisy_meta,
             "warnings": warnings,
-            "noise_active": bool(use_noise and self._last_run_used_aer_noise),
-            "noise_profile": noise_prof if use_noise else None,
+            "noise_active": noisy_meta is not None,
+            "noise_profile": noise_prof if noisy_meta is not None else None,
         }
 
     async def oracle_sketch(self, api_key: str, payload: dict) -> dict:

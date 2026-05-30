@@ -117,3 +117,83 @@ def optimize_portfolio(
             "num_variables": int(qp.get_num_vars()),
         },
     }
+
+
+def compute_efficient_frontier(
+    tickers: list[str],
+    expected_returns: dict[str, float] | list[float] | np.ndarray,
+    covariance_matrix: list[list[float]] | np.ndarray,
+    *,
+    n_points: int = 25,
+) -> list[dict[str, Any]]:
+    """
+    Classical mean-variance efficient frontier (long-only, fully invested).
+
+    Each point: ``{risk, return, weights}`` with annualized volatility and return.
+  """
+    from scipy.optimize import minimize
+
+    tickers = [str(t).strip().upper() for t in tickers if str(t).strip()]
+    mu, sigma = _to_mu_sigma(tickers, expected_returns, covariance_matrix)
+    n = len(tickers)
+    if n < 2:
+        raise ValueError("Need at least two tickers for the efficient frontier.")
+
+    n_pts = max(5, min(50, int(n_points)))
+    targets = np.linspace(float(mu.min()), float(mu.max()), n_pts)
+
+    def portfolio_stats(w: np.ndarray) -> tuple[float, float]:
+        w = np.asarray(w, dtype=float)
+        ret = float(mu @ w)
+        risk = float(np.sqrt(max(w @ sigma @ w, 0.0)))
+        return ret, risk
+
+    curve: list[dict[str, Any]] = []
+    x0 = np.full(n, 1.0 / n)
+    bounds = [(0.0, 1.0)] * n
+    cons_sum = {"type": "eq", "fun": lambda w: float(np.sum(w) - 1.0)}
+
+    for target in targets:
+        cons_ret = {
+            "type": "eq",
+            "fun": lambda w, t=target: float(mu @ w - t),
+        }
+
+        def obj(w: np.ndarray) -> float:
+            w = np.asarray(w, dtype=float)
+            return float(w @ sigma @ w)
+
+        res = minimize(
+            obj,
+            x0,
+            method="SLSQP",
+            bounds=bounds,
+            constraints=[cons_sum, cons_ret],
+            options={"maxiter": 200, "ftol": 1e-8},
+        )
+        if not res.success:
+            continue
+        w = np.asarray(res.x, dtype=float)
+        w = np.maximum(w, 0.0)
+        w = w / (w.sum() or 1.0)
+        ret, risk = portfolio_stats(w)
+        curve.append(
+            {
+                "return": ret,
+                "risk": risk,
+                "weights": {tickers[i]: float(w[i]) for i in range(n)},
+            }
+        )
+        x0 = w
+
+    if not curve:
+        w = np.full(n, 1.0 / n)
+        ret, risk = portfolio_stats(w)
+        curve.append(
+            {
+                "return": ret,
+                "risk": risk,
+                "weights": {tickers[i]: float(w[i]) for i in range(n)},
+            }
+        )
+    return curve

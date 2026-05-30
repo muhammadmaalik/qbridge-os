@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from backend.finance_data import get_stock_data
-from backend.quantum_finance import optimize_portfolio
+from backend.quantum_finance import compute_efficient_frontier, optimize_portfolio
 
 router = APIRouter()
 
@@ -97,6 +97,8 @@ async def finance_optimize_portfolio(body: OptimizePortfolioRequest):
             detail=f"Quantum optimization failed: {e}",
         ) from e
 
+    frontier = compute_efficient_frontier(order, mu, cov, n_points=25)
+
     return {
         "allocation": opt["allocation"],
         "selected_tickers": opt["selected_tickers"],
@@ -114,4 +116,35 @@ async def finance_optimize_portfolio(body: OptimizePortfolioRequest):
             "solution_vector": opt["solution_vector"],
             "quadratic_program": opt["quadratic_program"],
         },
+        "efficient_frontier": frontier,
+        "sentiment_scores": market.get("sentiment_scores"),
     }
+
+
+@router.get("/frontier")
+async def finance_efficient_frontier(
+    tickers: str = Query(..., description="Comma-separated symbols"),
+    period: str = Query("1mo"),
+    n_points: int = Query(25, ge=5, le=50),
+):
+    """Mean-variance efficient frontier from Yahoo data + VADER-adjusted returns."""
+    syms = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    try:
+        market = get_stock_data(syms, period=period)
+        order = list(market["tickers"])
+        curve = compute_efficient_frontier(
+            order,
+            market["expected_returns"],
+            market["covariance_matrix"],
+            n_points=n_points,
+        )
+        return {
+            "tickers": order,
+            "period": period,
+            "sentiment_scores": market.get("sentiment_scores"),
+            "efficient_frontier": curve,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e

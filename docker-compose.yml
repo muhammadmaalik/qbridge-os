@@ -1,9 +1,15 @@
-version: '3.8'
+version: "3.8"
+
+# Full stack for x64 Linux / Docker Desktop (amd64). PySCF + VQE run inside `api`.
+# Usage:  docker compose up --build
+# API:    http://127.0.0.1:8000   Frontend (local): http://127.0.0.1:3000
+
 services:
   db:
     image: postgres:15
+    platform: linux/amd64
     container_name: qbridge_db
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_USER: qbridge
       POSTGRES_PASSWORD: password
@@ -13,6 +19,41 @@ services:
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qbridge -d qaas_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+      platforms:
+        - linux/amd64
+    platform: linux/amd64
+    container_name: qbridge_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      QBRIDGE_SKIP_PQC_VERIFY: "1"
+      QBRIDGE_FORCE_MEMORY_DB: "0"
+      DB_HOST: db
+      DB_USER: qbridge
+      DB_PASSWORD: password
+      DB_NAME: qaas_db
+      DB_PORT: "5432"
+      QBRIDGE_JWT_SECRET: ${QBRIDGE_JWT_SECRET:-change-me-in-production}
+      QBRIDGE_SMTP_HOST: ${QBRIDGE_SMTP_HOST:-}
+      QBRIDGE_SMTP_PORT: ${QBRIDGE_SMTP_PORT:-587}
+      QBRIDGE_SMTP_USER: ${QBRIDGE_SMTP_USER:-}
+      QBRIDGE_SMTP_PASSWORD: ${QBRIDGE_SMTP_PASSWORD:-}
+      QBRIDGE_SMTP_FROM: ${QBRIDGE_SMTP_FROM:-}
+      QBRIDGE_AUTH_DEV_LOG_OTP: ${QBRIDGE_AUTH_DEV_LOG_OTP:-1}
 
 volumes:
   pgdata:

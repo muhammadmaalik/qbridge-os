@@ -2,6 +2,9 @@
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE,
+    password_hash TEXT,
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -48,3 +51,15 @@ CREATE TRIGGER update_job_logs_modtime
 
 -- Insert a default user for testing
 INSERT INTO users (username) VALUES ('testuser') ON CONFLICT (username) DO NOTHING;
+
+-- Email OTP challenges for two-factor login
+CREATE TABLE IF NOT EXISTS login_otp_challenges (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    otp_hash VARCHAR(128) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_login_otp_user ON login_otp_challenges(user_id);

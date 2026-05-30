@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import logging
 import time
 import asyncio
 import json
+import traceback
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Header
 from pydantic import BaseModel, Field, model_validator
 from backend.quantum_router import QuantumRouter
@@ -13,6 +15,7 @@ from backend.routers.security import verify_simulation_request
 
 router = APIRouter()
 qr = QuantumRouter()
+logger = logging.getLogger("qbridge.compute")
 
 
 def molecule_request_canonical(req: "MoleculeRequest") -> str:
@@ -21,8 +24,19 @@ def molecule_request_canonical(req: "MoleculeRequest") -> str:
     scan_s = (req.scan or "").strip()
     scan_part = f"|scan:{scan_s}"
     noise_part = "|noise:1" if req.noise else "|noise:0"
-    if req.smiles and str(req.smiles).strip():
-        return f"{req.username}|smiles:{str(req.smiles).strip()}|hw:{hw}|q:{mq}{scan_part}{noise_part}"
+    smiles = (req.smiles or "").strip()
+    if smiles:
+        return f"{req.username}|smiles:{smiles}|hw:{hw}|q:{mq}{scan_part}{noise_part}"
+
+    smiles_a = (req.smiles_a or "").strip()
+    smiles_b = (req.smiles_b or "").strip()
+    if smiles_a and smiles_b:
+        return (
+            f"{req.username}|dimer:{smiles_a}+{smiles_b}"
+            f"|dist:{float(req.distance_angstrom)}|charge:{int(req.charge)}"
+            f"|hw:{hw}|q:{mq}{scan_part}{noise_part}"
+        )
+
     st = str(req.structure or "").strip()
     return f"{req.username}|structure:{st}|hw:{hw}|q:{mq}{scan_part}{noise_part}"
 
@@ -38,13 +52,24 @@ class MoleculeRequest(BaseModel):
         ),
     )
     smiles: str | None = None
+    charge: int = Field(
+        default=0,
+        description="Total molecular charge for the electronic-structure calculation.",
+    )
+    # Optional: dimer / multi-fragment proxy supermolecule.
+    smiles_a: str | None = None
+    smiles_b: str | None = None
+    distance_angstrom: float = Field(
+        default=2.0,
+        description="Fragment separation along +Z when building the dimer supermolecule.",
+    )
     hardware_provider: str = Field(
         default="ibm",
         description="ibm (prefer real QPU via Runtime), local (simulator), anu (simulator + ANU entropy tag).",
     )
     max_qubits: int = Field(
-        default=28,
-        description="Cap Jordan–Wigner qubit width (2 × active spatial orbitals) for IBM/local hardware.",
+        default=12,
+        description="Cap Jordan–Wigner qubit width (2 × active spatial orbitals). Default 12 for statevector performance.",
     )
     scan: str | None = Field(
         default=None,
@@ -57,10 +82,22 @@ class MoleculeRequest(BaseModel):
 
     @model_validator(mode="after")
     def require_structure_or_smiles(self):
-        has_s = self.smiles and str(self.smiles).strip()
-        has_t = self.structure and str(self.structure).strip()
-        if not has_s and not has_t:
-            raise ValueError("Provide either `structure` (formula/name) or `smiles`.")
+        has_s = bool(self.smiles and str(self.smiles).strip())
+        has_t = bool(self.structure and str(self.structure).strip())
+        has_a = bool(self.smiles_a and str(self.smiles_a).strip())
+        has_b = bool(self.smiles_b and str(self.smiles_b).strip())
+
+        if has_s and has_t:
+            raise ValueError("Provide only one of `structure` or `smiles` (or use dimer mode).")
+        if has_a and has_b and (has_s or has_t):
+            raise ValueError("Dimer mode cannot be combined with `structure` or `smiles`; use ONLY `smiles_a` and `smiles_b`.")
+        if (has_a and not has_b) or (has_b and not has_a):
+            raise ValueError("Dimer mode requires BOTH `smiles_a` and `smiles_b`.")
+
+        if not (has_s or has_t or (has_a and has_b)):
+            raise ValueError(
+                "Provide either `structure` or `smiles`, or use dimer mode with `smiles_a` and `smiles_b`."
+            )
         return self
 
 
@@ -152,7 +189,12 @@ async def compute_molecule(
 
     user_id = await db.fetchval("SELECT id FROM users WHERE username = $1", req.username)
     if not user_id:
-        raise HTTPException(status_code=404, detail="User not found")
+        user_id = await db.fetchval(
+            "INSERT INTO users (username) VALUES ($1) RETURNING id",
+            req.username,
+        )
+    if not user_id:
+        raise HTTPException(status_code=500, detail="Could not resolve user id")
 
     job_id = await db.fetchval(
         "INSERT INTO job_logs (user_id, job_type, status) VALUES ($1, 'SIMULATION', 'PENDING') RETURNING id",
@@ -174,6 +216,10 @@ async def compute_molecule(
     payload = {
         "structure": req.structure,
         "smiles": req.smiles,
+        "charge": int(req.charge),
+        "smiles_a": req.smiles_a,
+        "smiles_b": req.smiles_b,
+        "distance_angstrom": float(req.distance_angstrom),
         "max_qubits": req.max_qubits,
         "hardware_provider": eff_hw,
         "_requested_hardware_provider": (req.hardware_provider or "ibm").strip().lower(),
@@ -196,6 +242,70 @@ async def compute_molecule(
     }
 
 
+@router.post("/molecule/sync")
+async def compute_molecule_sync(
+    req: MoleculeRequest,
+    x_qbridge_session: str | None = Header(default=None, alias="X-QBridge-Session"),
+    x_qbridge_signature: str | None = Header(default=None, alias="X-QBridge-Signature"),
+):
+    """
+    Run VQE inline and return the full result in one 200 response (no WebSocket).
+    Useful for local debugging and dashboard polling.
+    """
+    canonical = molecule_request_canonical(req)
+    if not verify_simulation_request(x_qbridge_session, x_qbridge_signature, canonical):
+        raise HTTPException(
+            status_code=401,
+            detail="PQC verification failed: invalid or missing session / MAC.",
+        )
+
+    user_id = await db.fetchval("SELECT id FROM users WHERE username = $1", req.username)
+    if not user_id:
+        user_id = await db.fetchval(
+            "INSERT INTO users (username) VALUES ($1) RETURNING id",
+            req.username,
+        )
+
+    eff_hw = (req.hardware_provider or "ibm").strip().lower()
+    if eff_hw == "ibm":
+        api_key_row = await db.fetchval(
+            "SELECT encrypted_api_key FROM api_credentials WHERE user_id = $1 AND service_provider = 'IBM'",
+            user_id,
+        )
+        if not api_key_row or str(api_key_row).strip() in ("", "local_fallback"):
+            eff_hw = "local"
+
+    payload = {
+        "structure": req.structure,
+        "smiles": req.smiles,
+        "charge": int(req.charge),
+        "smiles_a": req.smiles_a,
+        "smiles_b": req.smiles_b,
+        "distance_angstrom": float(req.distance_angstrom),
+        "max_qubits": req.max_qubits,
+        "hardware_provider": eff_hw,
+        "_requested_hardware_provider": (req.hardware_provider or "ibm").strip().lower(),
+        "scan": req.scan,
+        "noise": bool(req.noise),
+    }
+    try:
+        result = await qr.simulate_molecule("local_fallback", payload)
+    except Exception as e:
+        tb = traceback.format_exc()
+        logger.error("molecule/sync failed:\n%s", tb)
+        raise HTTPException(
+            status_code=500,
+            detail=f"{type(e).__name__}: {e}\n\n{tb}",
+        ) from e
+
+    return {
+        "status": "COMPLETED",
+        "job_id": None,
+        "data": result,
+        "engaged_simulator_fallback": False,
+    }
+
+
 @router.post("/oracle-sketch")
 async def compute_oracle_sketch(
     req: OracleSketchRequest,
@@ -213,7 +323,10 @@ async def compute_oracle_sketch(
 
     user_id = await db.fetchval("SELECT id FROM users WHERE username = $1", req.username)
     if not user_id:
-        raise HTTPException(status_code=404, detail="User not found")
+        user_id = await db.fetchval(
+            "INSERT INTO users (username) VALUES ($1) RETURNING id",
+            req.username,
+        )
 
     job_id = await db.fetchval(
         "INSERT INTO job_logs (user_id, job_type, status) VALUES ($1, 'ML_ORACLE', 'PENDING') RETURNING id",
