@@ -38,10 +38,13 @@ def main() -> None:
     _ready.setLevel(logging.INFO)
     logging.getLogger("uvicorn.error").addHandler(_ready)
 
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", "8000"))
+
     uvicorn.run(
         "backend.main:app",
-        host="127.0.0.1",
-        port=8000,
+        host=host,
+        port=port,
         log_level="info",
         log_config=None,
         timeout_keep_alive=120,

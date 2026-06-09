@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
@@ -45,6 +47,7 @@ class LoginStepResponse(BaseModel):
     challenge_id: str
     message: str
     expires_in_seconds: int
+    dev_otp: str | None = None
 
 
 class TokenResponse(BaseModel):
@@ -86,13 +89,28 @@ async def register(payload: RegisterPayload):
 async def login(payload: LoginPayload):
     try:
         user = await authenticate_password(email=payload.email, password=payload.password)
-        challenge_id = await start_login_otp(user)
+        challenge_id, dev_otp = await start_login_otp(user)
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e)) from e
+
+    dev_mode = os.environ.get("QBRIDGE_AUTH_DEV_LOG_OTP", "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    message = f"A 6-digit security code was sent to {user.email}."
+    if dev_mode and dev_otp:
+        message = (
+            f"Development mode: your verification code is {dev_otp}. "
+            "Configure SMTP on the server to send codes by email."
+        )
+
     return LoginStepResponse(
         challenge_id=challenge_id,
-        message=f"A 6-digit security code was sent to {user.email}.",
+        message=message,
         expires_in_seconds=OTP_EXPIRE_MINUTES * 60,
+        dev_otp=dev_otp if dev_mode else None,
     )
 
 

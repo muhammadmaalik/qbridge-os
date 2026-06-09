@@ -17,6 +17,7 @@ COPY run_api.py .
 COPY scripts ./scripts
 
 ENV QBRIDGE_SKIP_PQC_VERIFY=1
+ENV HOST=0.0.0.0
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \

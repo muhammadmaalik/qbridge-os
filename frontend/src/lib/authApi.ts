@@ -14,6 +14,7 @@ export type LoginStep = {
   challenge_id: string;
   message: string;
   expires_in_seconds: number;
+  dev_otp?: string | null;
 };
 
 export type TokenResponse = {
@@ -52,7 +53,14 @@ export function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function parseError(res: Response): Promise<string> {
+async function parseError(res: Response, path: string): Promise<string> {
+  if (res.status === 404) {
+    return (
+      `Auth API not found (${path}). The backend may need redeploying — ` +
+      `expected ${API_BASE}${path}. For local dev, run the API on port 8000 ` +
+      `and set NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000 in frontend/.env.local.`
+    );
+  }
   try {
     const j = (await res.json()) as { detail?: string | { msg?: string }[] };
     if (typeof j.detail === "string") return j.detail;
@@ -73,7 +81,7 @@ export async function registerAccount(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, username: username || undefined }),
   });
-  if (!res.ok) throw new Error(await parseError(res));
+  if (!res.ok) throw new Error(await parseError(res, "/api/v1/auth/register"));
   return (await res.json()) as AuthUser;
 }
 
@@ -83,7 +91,7 @@ export async function loginStep1(email: string, password: string): Promise<Login
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
-  if (!res.ok) throw new Error(await parseError(res));
+  if (!res.ok) throw new Error(await parseError(res, "/api/v1/auth/login"));
   return (await res.json()) as LoginStep;
 }
 
@@ -93,7 +101,7 @@ export async function verifyOtp(challengeId: string, otp: string): Promise<Token
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ challenge_id: challengeId, otp }),
   });
-  if (!res.ok) throw new Error(await parseError(res));
+  if (!res.ok) throw new Error(await parseError(res, "/api/v1/auth/verify-otp"));
   const data = (await res.json()) as TokenResponse;
   saveSession(data.access_token, data.user);
   return data;

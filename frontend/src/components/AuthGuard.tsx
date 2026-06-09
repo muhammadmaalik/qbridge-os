@@ -36,7 +36,7 @@ export default function AuthGuard({ children }: Props) {
 
   if (checking || !user) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500 text-sm">
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-600 text-sm">
         Verifying session…
       </div>
     );

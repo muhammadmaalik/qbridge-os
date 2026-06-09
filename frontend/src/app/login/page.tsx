@@ -9,8 +9,12 @@ import {
   registerAccount,
   verifyOtp,
 } from "@/lib/authApi";
+import { API_BASE } from "@/lib/pqcHandshake";
 
 type Step = "credentials" | "otp" | "register";
+
+const IBM_QUANTUM_BG =
+  "https://upload.wikimedia.org/wikipedia/commons/8/8e/IBM_Q_system.jpg";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,6 +36,7 @@ export default function LoginPage() {
       const res = await loginStep1(email, password);
       setChallengeId(res.challenge_id);
       setMessage(res.message);
+      if (res.dev_otp) setOtp(res.dev_otp);
       setStep("otp");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -70,134 +75,138 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-200 flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500" />
-            <span className="text-xl font-semibold text-zinc-100">Quantum Bridge OS</span>
-          </div>
-          <p className="text-sm text-zinc-500">Secure access for students and operators</p>
-        </div>
-
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 shadow-xl">
-          <div className="flex gap-2 mb-6">
-            <button
-              type="button"
-              onClick={() => {
-                setStep("credentials");
-                setError("");
-              }}
-              className={`flex-1 py-2 text-sm rounded-lg border ${
-                step !== "register"
-                  ? "border-indigo-500/50 bg-indigo-500/10 text-indigo-300"
-                  : "border-zinc-800 text-zinc-500"
-              }`}
-            >
-              Sign in
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setStep("register");
-                setError("");
-              }}
-              className={`flex-1 py-2 text-sm rounded-lg border ${
-                step === "register"
-                  ? "border-indigo-500/50 bg-indigo-500/10 text-indigo-300"
-                  : "border-zinc-800 text-zinc-500"
-              }`}
-            >
-              Register
-            </button>
+    <main
+      className="min-h-screen bg-slate-900 bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: `url('${IBM_QUANTUM_BG}')` }}
+    >
+      <div className="min-h-screen bg-slate-900/70 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="mb-6 text-center text-white">
+            <h1 className="text-2xl font-semibold tracking-tight">Quantum Bridge OS</h1>
+            <p className="mt-1 text-sm text-slate-200">Sign in to access the quantum platform</p>
           </div>
 
-          {step === "register" && (
-            <form onSubmit={onRegister} className="space-y-4">
-              <Field label="Email" type="email" value={email} onChange={setEmail} required />
-              <Field
-                label="Username (optional)"
-                value={username}
-                onChange={setUsername}
-                placeholder="defaults to email prefix"
-              />
-              <Field
-                label="Password"
-                type="password"
-                value={password}
-                onChange={setPassword}
-                required
-                hint="Minimum 8 characters"
-              />
-              {error && <Alert kind="error">{error}</Alert>}
-              <SubmitButton loading={loading}>Create account</SubmitButton>
-            </form>
-          )}
-
-          {step === "credentials" && (
-            <form onSubmit={onLogin} className="space-y-4">
-              <Field label="Email" type="email" value={email} onChange={setEmail} required />
-              <Field
-                label="Password"
-                type="password"
-                value={password}
-                onChange={setPassword}
-                required
-              />
-              {message && <Alert kind="info">{message}</Alert>}
-              {error && <Alert kind="error">{error}</Alert>}
-              <SubmitButton loading={loading}>Continue</SubmitButton>
-              <p className="text-xs text-zinc-500 text-center">
-                After password verification, a 6-digit code is sent to your email.
-              </p>
-            </form>
-          )}
-
-          {step === "otp" && (
-            <form onSubmit={onVerify} className="space-y-4">
-              <p className="text-sm text-zinc-400">{message}</p>
-              <Field
-                label="Security code"
-                value={otp}
-                onChange={setOtp}
-                placeholder="000000"
-                maxLength={6}
-                inputMode="numeric"
-                required
-              />
-              {error && <Alert kind="error">{error}</Alert>}
-              <SubmitButton loading={loading}>Verify &amp; sign in</SubmitButton>
+          <div className="rounded border border-slate-200 bg-white p-6 shadow-lg">
+            <div className="mb-5 flex border-b border-slate-200">
               <button
                 type="button"
-                className="w-full text-sm text-zinc-500 hover:text-zinc-300"
                 onClick={() => {
                   setStep("credentials");
-                  setOtp("");
                   setError("");
                 }}
+                className={`flex-1 border-b-2 pb-2 text-sm font-medium ${
+                  step !== "register"
+                    ? "border-blue-600 text-blue-700"
+                    : "border-transparent text-slate-500"
+                }`}
               >
-                ← Back to email &amp; password
+                Sign in
               </button>
-            </form>
-          )}
-        </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("register");
+                  setError("");
+                }}
+                className={`flex-1 border-b-2 pb-2 text-sm font-medium ${
+                  step === "register"
+                    ? "border-blue-600 text-blue-700"
+                    : "border-transparent text-slate-500"
+                }`}
+              >
+                Register
+              </button>
+            </div>
 
-        <p className="mt-6 text-center text-xs text-zinc-600">
-          <Link href="/" className="hover:text-zinc-400">
-            Skip to dashboard
-          </Link>
-          {" · "}
-          <button
-            type="button"
-            className="hover:text-zinc-400"
-            onClick={() => {
-              clearSession();
-              router.push("/login");
-            }}
-          >
-            Clear session
-          </button>
-        </p>
+            {step === "register" && (
+              <form onSubmit={onRegister} className="space-y-4">
+                <Field label="Email" type="email" value={email} onChange={setEmail} required />
+                <Field
+                  label="Username (optional)"
+                  value={username}
+                  onChange={setUsername}
+                  placeholder="Defaults to email prefix"
+                />
+                <Field
+                  label="Password"
+                  type="password"
+                  value={password}
+                  onChange={setPassword}
+                  required
+                  hint="Minimum 8 characters"
+                />
+                {error && <Alert kind="error">{error}</Alert>}
+                <SubmitButton loading={loading}>Create account</SubmitButton>
+              </form>
+            )}
+
+            {step === "credentials" && (
+              <form onSubmit={onLogin} className="space-y-4">
+                <Field label="Email" type="email" value={email} onChange={setEmail} required />
+                <Field
+                  label="Password"
+                  type="password"
+                  value={password}
+                  onChange={setPassword}
+                  required
+                />
+                {message && <Alert kind="info">{message}</Alert>}
+                {error && <Alert kind="error">{error}</Alert>}
+                <SubmitButton loading={loading}>Continue</SubmitButton>
+                <p className="text-center text-xs text-slate-500">
+                  After password verification, enter the 6-digit security code.
+                </p>
+              </form>
+            )}
+
+            {step === "otp" && (
+              <form onSubmit={onVerify} className="space-y-4">
+                <p className="text-sm text-slate-600">{message}</p>
+                <Field
+                  label="Security code"
+                  value={otp}
+                  onChange={setOtp}
+                  placeholder="000000"
+                  maxLength={6}
+                  inputMode="numeric"
+                  required
+                />
+                {error && <Alert kind="error">{error}</Alert>}
+                <SubmitButton loading={loading}>Verify and sign in</SubmitButton>
+                <button
+                  type="button"
+                  className="w-full text-sm text-slate-500 hover:text-slate-800"
+                  onClick={() => {
+                    setStep("credentials");
+                    setOtp("");
+                    setError("");
+                  }}
+                >
+                  Back to email and password
+                </button>
+              </form>
+            )}
+          </div>
+
+          <p className="mt-4 text-center text-xs text-slate-300">
+            API: {API_BASE}
+            {" · "}
+            <Link href="/" className="underline hover:text-white">
+              Dashboard
+            </Link>
+            {" · "}
+            <button
+              type="button"
+              className="underline hover:text-white"
+              onClick={() => {
+                clearSession();
+                router.push("/login");
+              }}
+            >
+              Clear session
+            </button>
+          </p>
+        </div>
       </div>
     </main>
   );
@@ -226,7 +235,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide">{label}</span>
+      <span className="text-sm font-medium text-slate-700">{label}</span>
       <input
         type={type}
         value={value}
@@ -235,9 +244,9 @@ function Field({
         placeholder={placeholder}
         maxLength={maxLength}
         inputMode={inputMode}
-        className="mt-1.5 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
       />
-      {hint && <span className="mt-1 block text-xs text-zinc-600">{hint}</span>}
+      {hint && <span className="mt-1 block text-xs text-slate-500">{hint}</span>}
     </label>
   );
 }
@@ -253,7 +262,7 @@ function SubmitButton({
     <button
       type="submit"
       disabled={loading}
-      className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+      className="w-full rounded bg-blue-700 py-2.5 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-50"
     >
       {loading ? "Please wait…" : children}
     </button>
@@ -263,9 +272,9 @@ function SubmitButton({
 function Alert({ children, kind }: { children: React.ReactNode; kind: "error" | "info" }) {
   const cls =
     kind === "error"
-      ? "border-red-900/50 bg-red-950/30 text-red-300"
-      : "border-indigo-900/50 bg-indigo-950/30 text-indigo-300";
+      ? "border-red-200 bg-red-50 text-red-800"
+      : "border-blue-200 bg-blue-50 text-blue-900";
   return (
-    <div className={`rounded-lg border px-3 py-2 text-sm ${cls}`}>{children}</div>
+    <div className={`rounded border px-3 py-2 text-sm ${cls}`}>{children}</div>
   );
 }
