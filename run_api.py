@@ -22,6 +22,8 @@ def main() -> None:
     # Local launcher: allow POST /api/v1/compute/* without PQC session headers.
     # Set QBRIDGE_SKIP_PQC_VERIFY=0 to require X-QBridge-Session / X-QBridge-Signature.
     os.environ.setdefault("QBRIDGE_SKIP_PQC_VERIFY", "1")
+    # Skip PostgreSQL probe on localhost when no DB is configured (falls back to in-memory store).
+    os.environ.setdefault("QBRIDGE_FORCE_MEMORY_DB", "1")
 
     import logging
     import logging.config

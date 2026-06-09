@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 from fastapi import APIRouter
 
+from backend.routers.security import _skip_pqc_verify_enabled
 from backend.telemetry import get_noise_telemetry
 
 router = APIRouter()
@@ -18,6 +19,11 @@ async def system_status():
             "algorithm": "CRYSTALS-Kyber-512-mock",
             "handshake_path": "/api/v1/security/handshake",
             "status": "ready",
+            # Dev-only bypass: True if QBRIDGE_SKIP_PQC_VERIFY is set. Lets the
+            # frontend / Swagger user see whether the /compute/* routes are
+            # currently accepting unsigned requests.
+            "dev_bypass_active": _skip_pqc_verify_enabled(),
+            "dev_bypass_env_var": "QBRIDGE_SKIP_PQC_VERIFY",
         },
         "noise_model": {
             "t1_us": round(80 + random.uniform(-15, 25), 1),

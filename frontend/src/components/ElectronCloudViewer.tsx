@@ -180,7 +180,16 @@ export default function ElectronCloudViewer({
           alpha: false,
           powerPreference: "high-performance",
         }}
-        dpr={[1, 2]}
+        dpr={[1, 1.5]}
+        onCreated={({ gl, invalidate }) => {
+          const canvas = gl.domElement;
+          canvas.addEventListener("webglcontextlost", (e) => {
+            e.preventDefault();
+          });
+          canvas.addEventListener("webglcontextrestored", () => {
+            invalidate();
+          });
+        }}
         className="touch-none select-none"
       >
         <CloudScene cloudData={data} nuclei={nuclei} />

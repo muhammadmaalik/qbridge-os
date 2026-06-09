@@ -24,14 +24,21 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        await establishPqcSession();
-        if (!cancelled) setSecureTunnel(true);
-      } catch {
-        if (!cancelled) setSecureTunnel(false);
+
+    const connectTunnel = async () => {
+      for (let attempt = 0; attempt < 10 && !cancelled; attempt++) {
+        try {
+          await establishPqcSession(attempt > 2 ? { force: true } : undefined);
+          if (!cancelled) setSecureTunnel(true);
+          return;
+        } catch {
+          if (!cancelled) setSecureTunnel(false);
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
       }
-    })();
+    };
+
+    void connectTunnel();
     return () => {
       cancelled = true;
     };

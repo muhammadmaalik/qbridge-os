@@ -1,6 +1,12 @@
+import logging
 import os
+
 import asyncpg
 from pydantic_settings import BaseSettings
+
+from backend.memory_store import handle_execute, handle_fetchval, memory
+
+logger = logging.getLogger("qbridge.db")
 
 class Settings(BaseSettings):
     db_user: str = "qbridge"
@@ -17,49 +23,65 @@ settings = Settings()
 class Database:
     def __init__(self):
         self.pool = None
+        self.use_memory = False
 
     async def connect(self):
-        self.pool = await asyncpg.create_pool(
-            user=settings.db_user,
-            password=settings.db_password,
-            database=settings.db_name,
-            host=settings.db_host,
-            port=settings.db_port
-        )
+        if os.environ.get("QBRIDGE_FORCE_MEMORY_DB", "").strip() in ("1", "true", "yes"):
+            self.use_memory = True
+            self.pool = None
+            memory._ensure_demo_user()
+            logger.info("Using in-memory store (QBRIDGE_FORCE_MEMORY_DB).")
+            return
+        try:
+            self.pool = await asyncpg.create_pool(
+                user=settings.db_user,
+                password=settings.db_password,
+                database=settings.db_name,
+                host=settings.db_host,
+                port=settings.db_port,
+                timeout=3.0,
+            )
+            self.use_memory = False
+        except Exception as e:
+            self.pool = None
+            self.use_memory = True
+            memory._ensure_demo_user()
+            logger.warning(
+                "PostgreSQL unavailable (%s); using in-memory job/user store.", e
+            )
 
     async def disconnect(self):
         if self.pool:
             await self.pool.close()
+            self.pool = None
 
     async def execute(self, query: str, *args):
-        if self.pool is None: return None
+        if self.use_memory or self.pool is None:
+            return handle_execute(query, *args)
         async with self.pool.acquire() as connection:
             return await connection.execute(query, *args)
 
     async def fetch(self, query: str, *args):
-        if self.pool is None: return []
+        if self.use_memory or self.pool is None:
+            return []
         async with self.pool.acquire() as connection:
             return await connection.fetch(query, *args)
 
     async def fetchrow(self, query: str, *args):
-        if self.pool is None: return None
+        if self.use_memory or self.pool is None:
+            return None
         async with self.pool.acquire() as connection:
             return await connection.fetchrow(query, *args)
 
     async def fetchval(self, query: str, *args):
-        if self.pool is None:
-            if "SELECT id FROM users" in query:
-                return "mock_user_id"
-            if "INSERT INTO job_logs" in query:
-                import uuid
-                return str(uuid.uuid4())
-            return None
+        if self.use_memory or self.pool is None:
+            return handle_fetchval(query, *args)
         async with self.pool.acquire() as connection:
             return await connection.fetchval(query, *args)
 
     async def ensure_demo_user(self) -> None:
-        """Create default ``testuser`` for the Quantum Terminal when PostgreSQL is empty."""
-        if self.pool is None:
+        if self.use_memory or self.pool is None:
+            memory._ensure_demo_user()
             return
         try:
             await self.execute(

@@ -7,17 +7,36 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import asyncpg
 from backend.routers import auth, entropy, compute, finance, security, system
+from backend.routers.security import _skip_pqc_verify_enabled
 from backend.database import db
+
+
+def _print_pqc_bypass_banner() -> None:
+    """Loudly announce that PQC auth is bypassed. Dev-only; never enable in prod."""
+    border = "=" * 72
+    msg = (
+        f"\n{border}\n"
+        "  QBRIDGE: PQC AUTH BYPASS IS ACTIVE  (QBRIDGE_SKIP_PQC_VERIFY=1)\n"
+        "  /api/v1/compute/* accepts requests without X-QBridge-Session\n"
+        "  and X-QBridge-Signature. /health and /api/v1/system/status\n"
+        "  surface this status so it is visible from the Swagger UI.\n"
+        "  DO NOT DEPLOY THIS CONFIGURATION.\n"
+        f"{border}\n"
+    )
+    print(msg, file=sys.stderr, flush=True)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    try:
-        await db.connect()
+    if _skip_pqc_verify_enabled():
+        _print_pqc_bypass_banner()
+    await db.connect()
+    if db.use_memory:
+        print("Database: in-memory store active (PostgreSQL offline or QBRIDGE_FORCE_MEMORY_DB=1)")
+    else:
         print("Connected to PostgreSQL")
-        await db.ensure_demo_user()
-    except Exception as e:
-        print(f"Failed to connect to DB: {e}")
+    await db.ensure_demo_user()
     yield
     # Shutdown
     await db.disconnect()
@@ -47,6 +66,21 @@ app.include_router(finance.router, prefix="/api/v1/finance")
 @app.get("/")
 async def root():
     return {"message": "Welcome to the Quantum Bridge OS API Gateway"}
+
+
+@app.get("/health")
+async def health_check() -> dict:
+    """
+    Lightweight liveness probe. Surfaces dev-mode flags (notably the PQC auth
+    bypass) so Swagger users can see at a glance whether the gateway is
+    running in a dev-bypass posture.
+    """
+    return {
+        "status": "ok",
+        "service": "Quantum Bridge OS",
+        "pqc_auth_bypass_active": _skip_pqc_verify_enabled(),
+        "pqc_auth_bypass_env_var": "QBRIDGE_SKIP_PQC_VERIFY",
+    }
 
 # Simple Connection Manager for WebSockets
 class ConnectionManager:

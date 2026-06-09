@@ -152,7 +152,12 @@ async def compute_molecule(
 
     user_id = await db.fetchval("SELECT id FROM users WHERE username = $1", req.username)
     if not user_id:
-        raise HTTPException(status_code=404, detail="User not found")
+        user_id = await db.fetchval(
+            "INSERT INTO users (username) VALUES ($1) RETURNING id",
+            req.username,
+        )
+    if not user_id:
+        raise HTTPException(status_code=500, detail="Could not resolve user id")
 
     job_id = await db.fetchval(
         "INSERT INTO job_logs (user_id, job_type, status) VALUES ($1, 'SIMULATION', 'PENDING') RETURNING id",
@@ -196,6 +201,65 @@ async def compute_molecule(
     }
 
 
+@router.post("/molecule/sync")
+async def compute_molecule_sync(
+    req: MoleculeRequest,
+    x_qbridge_session: str | None = Header(default=None, alias="X-QBridge-Session"),
+    x_qbridge_signature: str | None = Header(default=None, alias="X-QBridge-Signature"),
+):
+    """
+    Run VQE inline and return the full result in one 200 response (no WebSocket).
+    Useful for local debugging and dashboard polling.
+    """
+    canonical = molecule_request_canonical(req)
+    if not verify_simulation_request(x_qbridge_session, x_qbridge_signature, canonical):
+        raise HTTPException(
+            status_code=401,
+            detail="PQC verification failed: invalid or missing session / MAC.",
+        )
+
+    user_id = await db.fetchval("SELECT id FROM users WHERE username = $1", req.username)
+    if not user_id:
+        user_id = await db.fetchval(
+            "INSERT INTO users (username) VALUES ($1) RETURNING id",
+            req.username,
+        )
+
+    eff_hw = (req.hardware_provider or "ibm").strip().lower()
+    if eff_hw == "ibm":
+        api_key_row = await db.fetchval(
+            "SELECT encrypted_api_key FROM api_credentials WHERE user_id = $1 AND service_provider = 'IBM'",
+            user_id,
+        )
+        if not api_key_row or str(api_key_row).strip() in ("", "local_fallback"):
+            eff_hw = "local"
+
+    payload = {
+        "structure": req.structure,
+        "smiles": req.smiles,
+        "max_qubits": req.max_qubits,
+        "hardware_provider": eff_hw,
+        "_requested_hardware_provider": (req.hardware_provider or "ibm").strip().lower(),
+        "scan": req.scan,
+        "noise": bool(req.noise),
+    }
+
+    try:
+        result = await qr.simulate_molecule("local_fallback", payload)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"VQE pipeline failed: {exc}",
+        ) from exc
+    return {
+        "status": "COMPLETED",
+        "job_id": None,
+        "data": result,
+        "engaged_simulator_fallback": result.get("backend") == "simulated_vqe_fallback",
+        "ab_initio": bool((result.get("chemistry") or {}).get("ab_initio")),
+    }
+
+
 @router.post("/oracle-sketch")
 async def compute_oracle_sketch(
     req: OracleSketchRequest,
@@ -213,7 +277,10 @@ async def compute_oracle_sketch(
 
     user_id = await db.fetchval("SELECT id FROM users WHERE username = $1", req.username)
     if not user_id:
-        raise HTTPException(status_code=404, detail="User not found")
+        user_id = await db.fetchval(
+            "INSERT INTO users (username) VALUES ($1) RETURNING id",
+            req.username,
+        )
 
     job_id = await db.fetchval(
         "INSERT INTO job_logs (user_id, job_type, status) VALUES ($1, 'ML_ORACLE', 'PENDING') RETURNING id",
