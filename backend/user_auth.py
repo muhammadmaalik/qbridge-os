@@ -150,8 +150,8 @@ async def authenticate_password(*, email: str, password: str) -> UserRecord:
     return user
 
 
-async def start_login_otp(user: UserRecord) -> tuple[str, str]:
-    """Create OTP challenge, email the code, return (challenge_id, otp_plain)."""
+async def start_login_otp(user: UserRecord) -> str:
+    """Create OTP challenge, email the code, return challenge_id."""
     otp = _generate_otp()
     challenge_id = secrets.token_urlsafe(24)
     expires = datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRE_MINUTES)
@@ -179,7 +179,7 @@ async def start_login_otp(user: UserRecord) -> tuple[str, str]:
         )
 
     send_otp_email(to_email=user.email, otp_code=otp, username=user.username)
-    return challenge_id, otp
+    return challenge_id
 
 
 async def verify_login_otp(*, challenge_id: str, otp: str) -> UserRecord:

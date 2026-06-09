@@ -14,10 +14,24 @@ import sys
 _ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
+def _load_dotenv() -> None:
+    env_path = os.path.join(_ROOT, ".env")
+    if not os.path.isfile(env_path):
+        return
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(env_path, override=False)
+    except ImportError:
+        pass
+
+
 def main() -> None:
     os.chdir(_ROOT)
     if _ROOT not in sys.path:
         sys.path.insert(0, _ROOT)
+
+    _load_dotenv()
 
     # Local launcher: allow POST /api/v1/compute/* without PQC session headers.
     # Set QBRIDGE_SKIP_PQC_VERIFY=0 to require X-QBridge-Session / X-QBridge-Signature.

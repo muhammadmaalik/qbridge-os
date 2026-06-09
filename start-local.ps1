@@ -63,3 +63,8 @@ Write-Host "  http://127.0.0.1:3000/login"
 Write-Host "  http://127.0.0.1:3000/chemistry"
 Write-Host "  API docs: http://127.0.0.1:8000/docs"
 Write-Host ""
+if (-not (Test-Path (Join-Path $Root ".env"))) {
+    Write-Host "LOGIN EMAIL: Copy .env.example to .env and set QBRIDGE_SMTP_* (Gmail App Password)."
+    Write-Host "             Without SMTP, login OTP emails cannot be sent."
+    Write-Host ""
+}

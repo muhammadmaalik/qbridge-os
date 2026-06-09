@@ -14,7 +14,6 @@ export type LoginStep = {
   challenge_id: string;
   message: string;
   expires_in_seconds: number;
-  dev_otp?: string | null;
 };
 
 export type TokenResponse = {
@@ -63,7 +62,15 @@ async function parseError(res: Response, path: string): Promise<string> {
   }
   try {
     const j = (await res.json()) as { detail?: string | { msg?: string }[] };
-    if (typeof j.detail === "string") return j.detail;
+    if (typeof j.detail === "string") {
+      if (res.status === 503 && j.detail.includes("QBRIDGE_SMTP")) {
+        return (
+          "Email is not configured on the server. Copy .env.example to .env and add your " +
+          "SMTP settings (Gmail App Password works). Then restart the API."
+        );
+      }
+      return j.detail;
+    }
     if (Array.isArray(j.detail) && j.detail[0]?.msg) return j.detail[0].msg;
   } catch {
     /* ignore */
