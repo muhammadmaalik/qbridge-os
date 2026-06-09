@@ -400,12 +400,12 @@ export default function ChemistryPage() {
                             (demo fallback)
                           </span>
                         )}
-                        {realVqe === true && result.chemistry?.ab_initio && (
+                        {realVqe === true && result.chemistry?.ab_initio === true && (
                           <span className="ml-1 text-xs text-emerald-700">
                             (ab initio HF + VQE)
                           </span>
                         )}
-                        {realVqe === true && !result.chemistry?.ab_initio && (
+                        {realVqe === true && !result.chemistry?.ab_initio === true && (
                           <span className="ml-1 text-xs text-emerald-700">
                             (live VQE)
                           </span>
