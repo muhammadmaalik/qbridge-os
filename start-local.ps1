@@ -30,6 +30,19 @@ if (-not $Node) {
 $Frontend = Join-Path $Root "frontend"
 $NextBin = Join-Path $Frontend "node_modules\next\dist\bin\next"
 
+if (-not (Test-Path (Join-Path $Frontend "node_modules"))) {
+    Write-Host "Installing frontend dependencies..."
+    Push-Location $Frontend
+    npm install
+    Pop-Location
+}
+
+# Stop stale dev servers on ports 3000/8000 so restarts are reliable.
+foreach ($port in @(8000, 3000)) {
+    Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue |
+        ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
+}
+
 & (Join-Path $Root "scripts\install-frontend-native-arm64.ps1")
 & (Join-Path $Root "scripts\patch-lightningcss-turbopack.ps1")
 
