@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { IBM_Plex_Sans } from "next/font/google";
+import { Inter } from "next/font/google";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import {
@@ -12,7 +12,7 @@ import {
   verifyOtp,
 } from "@/lib/authApi";
 
-const ibm = IBM_Plex_Sans({
+const sans = Inter({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
 });
@@ -78,7 +78,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className={`${ibm.className} min-h-screen flex flex-col bg-[#f4f4f4] text-[#161616]`}>
+    <div className={`${sans.className} min-h-screen flex flex-col bg-[#f4f4f4] text-[#161616]`}>
       <header className="flex h-12 items-center border-b border-[#e0e0e0] bg-[#161616] px-6">
         <span className="text-sm font-semibold tracking-wide text-white">
           Quantum Bridge OS
@@ -89,20 +89,20 @@ export default function LoginPage() {
       <div className="flex flex-1 min-h-0">
         <aside className="relative hidden w-[52%] lg:block">
           <Image
-            src="/ibm-quantum.jpg"
-            alt="IBM Quantum System"
+            src="/login-hero.jpg"
+            alt="Abstract science and technology background"
             fill
             priority
             className="object-cover"
             sizes="52vw"
           />
-          <div className="absolute inset-0 bg-[#001d6c]/55" />
+          <div className="absolute inset-0 bg-slate-900/50" />
           <div className="absolute bottom-0 left-0 right-0 p-10 text-white">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#78a9ff]">
-              IBM Quantum
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-sky-300">
+              Quantum Bridge OS
             </p>
             <h2 className="mt-2 max-w-md text-2xl font-semibold leading-snug">
-              Enterprise quantum simulation and secure access
+              Secure access to quantum simulation tools
             </h2>
             <p className="mt-3 max-w-lg text-sm leading-relaxed text-[#e8e8e8]">
               Sign in to run chemistry VQE workloads, portfolio optimization, and
