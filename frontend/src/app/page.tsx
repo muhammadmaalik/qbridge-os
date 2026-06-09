@@ -6,7 +6,9 @@ import KeyManager from "@/components/KeyManager";
 import Console from "@/components/Console";
 import ActionPanel from "@/components/ActionPanel";
 import HelpCenter from "@/components/HelpCenter";
+import AuthGuard from "@/components/AuthGuard";
 import { API_BASE, establishPqcSession } from "@/lib/pqcHandshake";
+import { getStoredUser } from "@/lib/authApi";
 
 type NoiseInjection = {
   active?: boolean;
@@ -74,6 +76,7 @@ export default function Home() {
       : "off";
 
   return (
+    <AuthGuard>
     <main className="min-h-screen bg-zinc-950 text-zinc-200 font-sans p-4 md:p-8 relative">
       <div className="max-w-6xl mx-auto relative z-10">
         <header className="mb-8 border-b border-zinc-800 pb-5 flex justify-between items-end">
@@ -95,6 +98,12 @@ export default function Home() {
                 className="rounded-xl border border-cyan-400/35 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-cyan-200 transition hover:border-cyan-300/60 hover:bg-cyan-500/20"
               >
                 Quantum Finance
+              </Link>
+              <Link
+                href="/login"
+                className="rounded-xl border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200"
+              >
+                {getStoredUser()?.email ?? "Account"}
               </Link>
             </div>
           </div>
@@ -154,5 +163,6 @@ export default function Home() {
 
       <HelpCenter />
     </main>
+    </AuthGuard>
   );
 }

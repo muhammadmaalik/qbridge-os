@@ -15,8 +15,16 @@ class Settings(BaseSettings):
     db_host: str = "localhost"
     db_port: str = "5432"
 
-    class Config:
-        env_file = ".env"
+    model_config = {"env_file": ".env", "extra": "ignore"}
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Docker compose uses DB_* env vars
+        self.db_user = os.environ.get("DB_USER", self.db_user)
+        self.db_password = os.environ.get("DB_PASSWORD", self.db_password)
+        self.db_name = os.environ.get("DB_NAME", self.db_name)
+        self.db_host = os.environ.get("DB_HOST", self.db_host)
+        self.db_port = os.environ.get("DB_PORT", self.db_port)
 
 settings = Settings()
 
@@ -69,7 +77,9 @@ class Database:
 
     async def fetchrow(self, query: str, *args):
         if self.use_memory or self.pool is None:
-            return None
+            from backend.memory_store import handle_fetchrow
+
+            return handle_fetchrow(query, *args)
         async with self.pool.acquire() as connection:
             return await connection.fetchrow(query, *args)
 

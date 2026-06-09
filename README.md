@@ -92,3 +92,31 @@ Want to run Quantum Bridge OS on your own local infrastructure?
 ```bash
 git clone [https://github.com/muhammadmaalik/qbridge-os.git](https://github.com/muhammadmaalik/qbridge-os.git)
 cd qbridge-os
+
+### Local testing (localhost)
+
+1. Install backend deps:
+   - `cd qbridge-os`
+   - `pip install -r requirements.txt`
+   - For real quantum-chemistry integrals (recommended), also install:
+     - `pyscf`
+     - `rdkit-pypi`
+   - Note: the app will only use the real PySCF-based chemistry path if those are available.
+
+2. Start the backend API:
+   - `python run_api.py`
+   - It runs on `http://127.0.0.1:8000`
+
+3. Start the frontend:
+   - `cd frontend`
+   - `npm install`
+   - `npm run dev`
+   - Open the URL Next.js prints (usually `http://127.0.0.1:3000`)
+
+#### Chemistry experiments
+
+On the `/chemistry` page you can:
+- Run single-molecule VQE (paste any formula/SMILES-like input).
+- Run a dimer “supermolecule” experiment using `Dimer (A + B)` (inputs `smiles_a`, `smiles_b`, and `distance`).
+
+The practical size limit is controlled by `Max qubits (statevector budget)` in the UI; statevector simulation grows exponentially with qubit count.

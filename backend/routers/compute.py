@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import logging
 import time
 import asyncio
 import json
+import traceback
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Header
 from pydantic import BaseModel, Field, model_validator
 from backend.quantum_router import QuantumRouter
@@ -13,6 +15,7 @@ from backend.routers.security import verify_simulation_request
 
 router = APIRouter()
 qr = QuantumRouter()
+logger = logging.getLogger("qbridge.compute")
 
 
 def molecule_request_canonical(req: "MoleculeRequest") -> str:
@@ -21,8 +24,19 @@ def molecule_request_canonical(req: "MoleculeRequest") -> str:
     scan_s = (req.scan or "").strip()
     scan_part = f"|scan:{scan_s}"
     noise_part = "|noise:1" if req.noise else "|noise:0"
-    if req.smiles and str(req.smiles).strip():
-        return f"{req.username}|smiles:{str(req.smiles).strip()}|hw:{hw}|q:{mq}{scan_part}{noise_part}"
+    smiles = (req.smiles or "").strip()
+    if smiles:
+        return f"{req.username}|smiles:{smiles}|hw:{hw}|q:{mq}{scan_part}{noise_part}"
+
+    smiles_a = (req.smiles_a or "").strip()
+    smiles_b = (req.smiles_b or "").strip()
+    if smiles_a and smiles_b:
+        return (
+            f"{req.username}|dimer:{smiles_a}+{smiles_b}"
+            f"|dist:{float(req.distance_angstrom)}|charge:{int(req.charge)}"
+            f"|hw:{hw}|q:{mq}{scan_part}{noise_part}"
+        )
+
     st = str(req.structure or "").strip()
     return f"{req.username}|structure:{st}|hw:{hw}|q:{mq}{scan_part}{noise_part}"
 
@@ -38,13 +52,24 @@ class MoleculeRequest(BaseModel):
         ),
     )
     smiles: str | None = None
+    charge: int = Field(
+        default=0,
+        description="Total molecular charge for the electronic-structure calculation.",
+    )
+    # Optional: dimer / multi-fragment proxy supermolecule.
+    smiles_a: str | None = None
+    smiles_b: str | None = None
+    distance_angstrom: float = Field(
+        default=2.0,
+        description="Fragment separation along +Z when building the dimer supermolecule.",
+    )
     hardware_provider: str = Field(
         default="ibm",
         description="ibm (prefer real QPU via Runtime), local (simulator), anu (simulator + ANU entropy tag).",
     )
     max_qubits: int = Field(
-        default=28,
-        description="Cap Jordan–Wigner qubit width (2 × active spatial orbitals) for IBM/local hardware.",
+        default=12,
+        description="Cap Jordan–Wigner qubit width (2 × active spatial orbitals). Default 12 for statevector performance.",
     )
     scan: str | None = Field(
         default=None,
@@ -57,10 +82,22 @@ class MoleculeRequest(BaseModel):
 
     @model_validator(mode="after")
     def require_structure_or_smiles(self):
-        has_s = self.smiles and str(self.smiles).strip()
-        has_t = self.structure and str(self.structure).strip()
-        if not has_s and not has_t:
-            raise ValueError("Provide either `structure` (formula/name) or `smiles`.")
+        has_s = bool(self.smiles and str(self.smiles).strip())
+        has_t = bool(self.structure and str(self.structure).strip())
+        has_a = bool(self.smiles_a and str(self.smiles_a).strip())
+        has_b = bool(self.smiles_b and str(self.smiles_b).strip())
+
+        if has_s and has_t:
+            raise ValueError("Provide only one of `structure` or `smiles` (or use dimer mode).")
+        if has_a and has_b and (has_s or has_t):
+            raise ValueError("Dimer mode cannot be combined with `structure` or `smiles`; use ONLY `smiles_a` and `smiles_b`.")
+        if (has_a and not has_b) or (has_b and not has_a):
+            raise ValueError("Dimer mode requires BOTH `smiles_a` and `smiles_b`.")
+
+        if not (has_s or has_t or (has_a and has_b)):
+            raise ValueError(
+                "Provide either `structure` or `smiles`, or use dimer mode with `smiles_a` and `smiles_b`."
+            )
         return self
 
 
@@ -179,6 +216,10 @@ async def compute_molecule(
     payload = {
         "structure": req.structure,
         "smiles": req.smiles,
+        "charge": int(req.charge),
+        "smiles_a": req.smiles_a,
+        "smiles_b": req.smiles_b,
+        "distance_angstrom": float(req.distance_angstrom),
         "max_qubits": req.max_qubits,
         "hardware_provider": eff_hw,
         "_requested_hardware_provider": (req.hardware_provider or "ibm").strip().lower(),
@@ -237,20 +278,26 @@ async def compute_molecule_sync(
     payload = {
         "structure": req.structure,
         "smiles": req.smiles,
+        "charge": int(req.charge),
+        "smiles_a": req.smiles_a,
+        "smiles_b": req.smiles_b,
+        "distance_angstrom": float(req.distance_angstrom),
         "max_qubits": req.max_qubits,
         "hardware_provider": eff_hw,
         "_requested_hardware_provider": (req.hardware_provider or "ibm").strip().lower(),
         "scan": req.scan,
         "noise": bool(req.noise),
     }
-
     try:
         result = await qr.simulate_molecule("local_fallback", payload)
-    except Exception as exc:
+    except Exception as e:
+        tb = traceback.format_exc()
+        logger.error("molecule/sync failed:\n%s", tb)
         raise HTTPException(
-            status_code=502,
-            detail=f"VQE pipeline failed: {exc}",
-        ) from exc
+            status_code=500,
+            detail=f"{type(e).__name__}: {e}\n\n{tb}",
+        ) from e
+
     return {
         "status": "COMPLETED",
         "job_id": None,

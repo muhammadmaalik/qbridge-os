@@ -1,7 +1,14 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.9
+email-validator>=2.1.0
+bcrypt>=4.0.0
+python-jose[cryptography]>=3.3.0
 qiskit
 qiskit-aer
 qiskit-nature>=0.7.0
 qiskit-ibm-runtime>=0.46.0
+scipy>=1.10.0
 websockets>=16.0
 httpx>=0.28.0
 asyncpg>=0.31.0
@@ -16,3 +23,6 @@ yfinance>=0.2.40
 vaderSentiment>=3.3.0
 qiskit-optimization>=0.6.0
 qiskit-finance>=0.4.0
+# PySCF: pip wheels on Linux/macOS/WSL only — NOT native Windows (incl. Windows ARM64).
+# On Windows, run the API in WSL2 or Docker (Dockerfile.api). See setup-venv.ps1 notes.
+pyscf>=2.3.0; platform_system != "Windows"

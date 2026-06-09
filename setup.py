@@ -9,8 +9,14 @@ setup(
     install_requires=[
         "qiskit",
         "qiskit-aer",
+        "qiskit-nature>=0.7.0",
+        "qiskit-finance>=0.4.0",
+        "qiskit-optimization>=0.6.0",
+        "numpy",
+        "scipy",
+        "pyscf>=2.3.0",
+        "rdkit>=2023.9.1",
         "matplotlib",
-        "numpy"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

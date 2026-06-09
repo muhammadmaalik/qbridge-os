@@ -3,12 +3,13 @@ Universal chemical input → :class:`MoleculeInfo` + Jordan–Wigner qubit opera
 
 - SMILES: RDKit 3D conformer (ETKDG + MMFF/UFF), electron count, formula metadata.
 - Plain text: try RDKit SMILES, then PubChemPy (formula / name), then legacy hardcoded formulas.
-- Electronic structure: PySCF (ab initio) when available; H₂ tabulated STO-3G only if PySCF is missing.
+- Electronic structure: PyQInt Hartree–Fock integrals when available; H₂ tabulated STO-3G only if PyQInt is missing.
 """
 
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from typing import Any
 
@@ -494,10 +495,76 @@ def resolve_molecule_geometry(
     return mi, meta
 
 
+def resolve_dimer_geometry(
+    *,
+    smiles_a: str,
+    smiles_b: str,
+    distance_angstrom: float,
+    charge: int = 0,
+) -> tuple[MoleculeInfo, dict[str, Any]]:
+    """
+    Build a "supermolecule" from two SMILES strings separated by ``distance_angstrom``.
+
+    This is intended for exploration (e.g. drug fragment binding proxies). It is
+    not a reaction/chemistry optimizer: it simply embeds each fragment in 3D and
+    places them relative to each other, then runs the same electronic-structure +
+    VQE pipeline on the combined system.
+    """
+    if not _RDKIT_AVAILABLE:
+        raise RuntimeError("RDKit is required for dimer geometry (smiles_a/smiles_b).")
+
+    mi_a, meta_a = smiles_to_molecule_info(smiles_a, charge=0)
+    mi_b, meta_b = smiles_to_molecule_info(smiles_b, charge=0)
+
+    coords_a = np.asarray(mi_a.coords, dtype=np.float64)
+    coords_b = np.asarray(mi_b.coords, dtype=np.float64)
+
+    # Center each fragment at the origin, then separate along +Z.
+    coords_a = coords_a - coords_a.mean(axis=0, keepdims=True)
+    coords_b = coords_b - coords_b.mean(axis=0, keepdims=True)
+    coords_b = coords_b + np.array([0.0, 0.0, float(distance_angstrom)], dtype=np.float64)
+
+    symbols = list(mi_a.symbols) + list(mi_b.symbols)
+    coords = np.vstack([coords_a, coords_b])
+
+    # Compute multiplicity from the combined electron count parity.
+    tmp = MoleculeInfo(
+        symbols=symbols,
+        coords=[(float(x), float(y), float(z)) for x, y, z in coords],
+        multiplicity=1,
+        charge=int(charge),
+        units=DistanceUnit.ANGSTROM,
+    )
+    ne = _electron_count_molecule_info(tmp)
+    multiplicity = 1 if (ne % 2 == 0) else 2
+
+    mi = MoleculeInfo(
+        symbols=symbols,
+        coords=[(float(x), float(y), float(z)) for x, y, z in coords],
+        multiplicity=multiplicity,
+        charge=int(charge),
+        units=DistanceUnit.ANGSTROM,
+    )
+
+    fa = str(meta_a.get("molecular_formula") or "A")
+    fb = str(meta_b.get("molecular_formula") or "B")
+
+    meta: dict[str, Any] = {
+        "resolution_path": "dimer_rdkit_smiles",
+        "smiles_a": smiles_a,
+        "smiles_b": smiles_b,
+        "distance_angstrom": float(distance_angstrom),
+        "display_label": f"dimer({fa}+{fb})",
+        "molecular_formula_a": fa,
+        "molecular_formula_b": fb,
+    }
+    return mi, meta
+
+
 def build_qubit_operator_from_molecule_info(
     mi: MoleculeInfo,
     *,
-    max_qubits: int = 28,
+    max_qubits: int = 12,
     meta_extra: dict[str, Any] | None = None,
     mapper_kind: str = _MAPPER_JW,
 ) -> tuple[SparsePauliOp, MoleculeInfo, dict[str, Any]]:
@@ -532,7 +599,7 @@ def build_qubit_operator_from_chemical_input(
     *,
     structure: str | None = None,
     smiles: str | None = None,
-    max_qubits: int = 28,
+    max_qubits: int = 12,
     charge: int = 0,
     mapper_kind: str = _MAPPER_JW,
 ) -> tuple[SparsePauliOp, MoleculeInfo, dict[str, Any]]:
@@ -682,7 +749,7 @@ def _finalize_problem(
 def build_qubit_operator_from_formula(
     formula: str,
     *,
-    max_qubits: int = 28,
+    max_qubits: int = 12,
     charge: int = 0,
     mapper_kind: str = _MAPPER_JW,
 ) -> tuple[SparsePauliOp, MoleculeInfo, dict[str, Any]]:

@@ -14,6 +14,8 @@ from typing import Any
 class MemoryUser:
     id: str
     username: str
+    email: str | None = None
+    password_hash: str | None = None
 
 
 @dataclass
@@ -30,6 +32,7 @@ class InMemoryStore:
     def __init__(self) -> None:
         self.users_by_name: dict[str, MemoryUser] = {}
         self.users_by_id: dict[str, MemoryUser] = {}
+        self.users_by_email: dict[str, MemoryUser] = {}
         self.jobs: dict[str, MemoryJob] = {}
         self.api_keys: dict[tuple[str, str], str] = {}  # (user_id, provider) -> key
         self._ensure_demo_user()
@@ -52,6 +55,17 @@ class InMemoryStore:
         u = MemoryUser(id=uid, username=username)
         self.users_by_name[username] = u
         self.users_by_id[uid] = u
+        return uid
+
+    def create_auth_user(
+        self, *, uid: str, username: str, email: str, password_hash: str
+    ) -> str:
+        u = MemoryUser(
+            id=uid, username=username, email=email, password_hash=password_hash
+        )
+        self.users_by_name[username] = u
+        self.users_by_id[uid] = u
+        self.users_by_email[email] = u
         return uid
 
     def create_job(self, user_id: str, job_type: str, status: str = "PENDING") -> str:
@@ -94,6 +108,41 @@ def _parse_username(query: str, args: tuple) -> str | None:
     m = re.search(r"username\s*=\s*\$\d+", query, re.I)
     if m and args:
         return str(args[0])
+    return None
+
+
+def handle_fetchrow(query: str, *args: Any) -> dict[str, Any] | None:
+    q = " ".join(query.split())
+    if "SELECT id FROM users" in q and "email" in q:
+        email = str(args[0]).lower() if args else ""
+        u = memory.users_by_email.get(email)
+        return {"id": u.id} if u else None
+    if "SELECT id FROM users" in q and "username" in q:
+        uname = str(args[0]) if args else ""
+        u = memory.users_by_name.get(uname)
+        return {"id": u.id} if u else None
+    if "FROM users WHERE email" in q and "password_hash" in q:
+        email = str(args[0]).lower() if args else ""
+        u = memory.users_by_email.get(email)
+        if not u:
+            return None
+        return {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "password_hash": u.password_hash,
+        }
+    if "FROM users WHERE id" in q and "password_hash" in q:
+        uid = str(args[0]) if args else ""
+        u = memory.users_by_id.get(uid)
+        if not u or not u.email:
+            return None
+        return {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "password_hash": u.password_hash,
+        }
     return None
 
 

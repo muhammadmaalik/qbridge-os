@@ -13,6 +13,7 @@ from backend.chemistry_mapper import (
     build_qubit_operator_from_chemical_input,
     build_qubit_operator_from_molecule_info,
     molecule_with_first_bond_length,
+    resolve_dimer_geometry,
     resolve_molecule_geometry,
 )
 from backend.telemetry import set_noise_telemetry
@@ -362,7 +363,7 @@ class QuantumRouter:
 
     async def simulate_molecule(self, api_key: str, payload: dict) -> dict:
         """
-        Local CPU VQE pipeline using ab-initio (PySCF) integrals + real SLSQP optimization.
+        Local CPU VQE pipeline using ab-initio (PyQInt) integrals + real SLSQP optimization.
 
         Failures propagate to the API caller instead of substituting tabulated energies.
         Set ``QBRIDGE_ALLOW_SIMULATOR_FALLBACK=1`` only for demo/offline mode.
@@ -392,6 +393,11 @@ class QuantumRouter:
         self._last_run_used_aer_noise = False
         structure = payload.get("structure")
         smiles = payload.get("smiles")
+        charge = int(payload.get("charge") or 0)
+        smiles_a = payload.get("smiles_a")
+        smiles_b = payload.get("smiles_b")
+        distance_angstrom = float(payload.get("distance_angstrom") or 2.0)
+        dimer_mode = bool(smiles_a and str(smiles_a).strip()) and bool(smiles_b and str(smiles_b).strip())
         max_qubits = int(payload.get("max_qubits") or os.environ.get("QBRIDGE_MAX_QUBITS") or 28)
         vqe_maxiter = int(payload.get("vqe_maxiter") or 50)
         req_hw = payload.get("_requested_hardware_provider") or payload.get(
@@ -422,10 +428,33 @@ class QuantumRouter:
         chem_meta: dict
         label: str
 
-        if scan_raw and str(scan_raw).strip():
+        if dimer_mode:
+            if scan_raw and str(scan_raw).strip():
+                raise ValueError("scan is not supported for dimer mode (smiles_a/smiles_b).")
+
+            dimer_mi, geo_meta = resolve_dimer_geometry(
+                smiles_a=str(smiles_a).strip(),
+                smiles_b=str(smiles_b).strip(),
+                distance_angstrom=distance_angstrom,
+                charge=charge,
+            )
+            # Build qubit operator from explicit combined geometry.
+            observable, molecule_info, chem_meta = build_qubit_operator_from_molecule_info(
+                dimer_mi,
+                max_qubits=max_qubits,
+                meta_extra=geo_meta,
+                mapper_kind="jordan_wigner",
+            )
+            label = str(chem_meta.get("display_label") or "dimer")
+
+            energy, backend_used, qc, vqe_meta = await self._run_vqe_energy(
+                observable,
+                maxiter=vqe_maxiter,
+            )
+        elif scan_raw and str(scan_raw).strip():
             distances = _parse_scan_distances(str(scan_raw))
             base_mi, geo_meta = resolve_molecule_geometry(
-                structure=structure, smiles=smiles, charge=0
+                structure=structure, smiles=smiles, charge=charge
             )
             if len(base_mi.symbols) < 2:
                 raise ValueError("PES scan requires at least two atoms (e.g. H2 or LiH).")
@@ -505,6 +534,11 @@ class QuantumRouter:
                 except Exception as e:
                     warnings.append(f"[noise] noisy ⟨H⟩ pass failed: {e!r}")
 
+            chem_meta["nuclei_coords"] = [
+                [float(c[0]), float(c[1]), float(c[2])] for c in last_mi.coords
+            ]
+            chem_meta["atomic_symbols"] = [str(s) for s in last_mi.symbols]
+
             cloud_data = build_electron_probability_cloud(last_qc, last_mi)
             if noisy_meta is not None:
                 set_noise_telemetry(
@@ -544,18 +578,23 @@ class QuantumRouter:
                 "noise_profile": noise_prof if noisy_meta is not None else None,
             }
 
-        observable, molecule_info, chem_meta = build_qubit_operator_from_chemical_input(
-            structure=structure,
-            smiles=smiles,
-            max_qubits=max_qubits,
-            mapper_kind="parity",
-        )
-        label = str(chem_meta.get("display_label") or structure or smiles or "unknown")
+        if not dimer_mode:
+            observable, molecule_info, chem_meta = build_qubit_operator_from_chemical_input(
+                structure=structure,
+                smiles=smiles,
+                max_qubits=max_qubits,
+                charge=charge,
+                mapper_kind="parity",
+            )
+            label = str(
+                chem_meta.get("display_label") or structure or smiles or "unknown"
+            )
 
-        energy, backend_used, qc, vqe_meta = await self._run_vqe_energy(
-            observable,
-            maxiter=vqe_maxiter,
-        )
+            energy, backend_used, qc, vqe_meta = await self._run_vqe_energy(
+                observable,
+                maxiter=vqe_maxiter,
+            )
+
         if hw == "anu":
             seed = await self.fetch_anu_entropy()
             chem_meta = {**chem_meta, "anu_entropy_preview": seed[:16]}
@@ -574,6 +613,11 @@ class QuantumRouter:
                 self._last_run_used_aer_noise = True
             except Exception as e:
                 warnings.append(f"[noise] noisy ⟨H⟩ pass failed: {e!r}")
+
+        chem_meta["nuclei_coords"] = [
+            [float(c[0]), float(c[1]), float(c[2])] for c in molecule_info.coords
+        ]
+        chem_meta["atomic_symbols"] = [str(s) for s in molecule_info.symbols]
 
         cloud_data = build_electron_probability_cloud(qc, molecule_info)
         if noisy_meta is not None:
