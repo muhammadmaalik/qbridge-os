@@ -74,7 +74,7 @@ def send_otp_email(*, to_email: str, otp_code: str, username: str) -> None:
     msg.set_content(body)
 
     try:
-        with smtplib.SMTP(host, port, timeout=30) as smtp:
+        with smtplib.SMTP(host, port, timeout=15) as smtp:
             if use_tls:
                 smtp.starttls()
             if user:

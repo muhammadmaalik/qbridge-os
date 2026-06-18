@@ -1,11 +1,17 @@
 import asyncio
 import json
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import asyncpg
+from backend.http_security import (
+    RateLimitMiddleware,
+    SecurityHeadersMiddleware,
+    cors_origins,
+)
 from backend.routers import auth, entropy, compute, finance, security, system
 from backend.routers.security import _skip_pqc_verify_enabled
 from backend.database import db
@@ -45,14 +51,16 @@ app = FastAPI(
     title="Quantum Bridge OS (QaaS)",
     description="High-performance, asynchronous QaaS REST API and Gateway.",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -75,9 +83,13 @@ async def health_check() -> dict:
     bypass) so Swagger users can see at a glance whether the gateway is
     running in a dev-bypass posture.
     """
+    from backend.email_service import _smtp_configured
+
     return {
         "status": "ok",
         "service": "Quantum Bridge OS",
+        "auth_enabled": True,
+        "smtp_configured": _smtp_configured(),
         "pqc_auth_bypass_active": _skip_pqc_verify_enabled(),
         "pqc_auth_bypass_env_var": "QBRIDGE_SKIP_PQC_VERIFY",
     }
@@ -102,6 +114,8 @@ class ConnectionManager:
             await connection.send_text(message)
 
 manager = ConnectionManager()
+_WS_MAX_CONNECTIONS = int(os.environ.get("QBRIDGE_WS_MAX_CONNECTIONS", "50"))
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -111,6 +125,9 @@ async def websocket_endpoint(websocket: WebSocket):
     Run Uvicorn with a generous keep-alive when proxying, e.g.:
     ``uvicorn backend.main:app --timeout-keep-alive 120``
     """
+    if len(manager.active_connections) >= _WS_MAX_CONNECTIONS:
+        await websocket.close(code=1013, reason="Server busy")
+        return
     await manager.connect(websocket)
     stop = asyncio.Event()
 

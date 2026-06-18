@@ -2,6 +2,7 @@ import { API_BASE } from "./pqcHandshake";
 
 const TOKEN_KEY = "qbridge_auth_token_v1";
 const USER_KEY = "qbridge_auth_user_v1";
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 export type AuthUser = {
   id: string;
@@ -20,6 +21,12 @@ export type TokenResponse = {
   access_token: string;
   token_type: string;
   user: AuthUser;
+};
+
+export type ApiHealth = {
+  status?: string;
+  auth_enabled?: boolean;
+  smtp_configured?: boolean;
 };
 
 export function getStoredToken(): string | null {
@@ -52,21 +59,51 @@ export function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+async function apiFetch(
+  path: string,
+  init?: RequestInit,
+  timeoutMs = DEFAULT_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(`${API_BASE}${path}`, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(
+        `Request timed out after ${Math.round(timeoutMs / 1000)}s. ` +
+          `The API at ${API_BASE} may be waking up (free tier) or unreachable.`
+      );
+    }
+    throw new Error(
+      `Cannot reach the API at ${API_BASE}. ` +
+        `Start the backend locally or check your deployment.`
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function parseError(res: Response, path: string): Promise<string> {
   if (res.status === 404) {
     return (
-      `Auth API not found (${path}). The backend may need redeploying — ` +
-      `expected ${API_BASE}${path}. For local dev, run the API on port 8000 ` +
-      `and set NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000 in frontend/.env.local.`
+      `Auth API not found (${path}). The backend at ${API_BASE} is running an old build ` +
+      `without login routes. Redeploy the API on Render, then try again.`
     );
+  }
+  if (res.status === 429) {
+    return "Too many login attempts. Wait one minute and try again.";
   }
   try {
     const j = (await res.json()) as { detail?: string | { msg?: string }[] };
     if (typeof j.detail === "string") {
       if (res.status === 503 && j.detail.includes("QBRIDGE_SMTP")) {
         return (
-          "Email is not configured on the server. Copy .env.example to .env and add your " +
-          "SMTP settings (Gmail App Password works). Then restart the API."
+          "Email is not configured on the server. Add SMTP settings to the API .env " +
+          "(see .env.example), then restart the backend."
         );
       }
       return j.detail;
@@ -78,12 +115,18 @@ async function parseError(res: Response, path: string): Promise<string> {
   return res.statusText || "Request failed";
 }
 
+export async function checkApiHealth(): Promise<ApiHealth> {
+  const res = await apiFetch("/health", { method: "GET" }, 12_000);
+  if (!res.ok) throw new Error(`API health check failed (${res.status})`);
+  return (await res.json()) as ApiHealth;
+}
+
 export async function registerAccount(
   email: string,
   password: string,
   username?: string
 ): Promise<AuthUser> {
-  const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
+  const res = await apiFetch("/api/v1/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, username: username || undefined }),
@@ -93,7 +136,7 @@ export async function registerAccount(
 }
 
 export async function loginStep1(email: string, password: string): Promise<LoginStep> {
-  const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+  const res = await apiFetch("/api/v1/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -103,7 +146,7 @@ export async function loginStep1(email: string, password: string): Promise<Login
 }
 
 export async function verifyOtp(challengeId: string, otp: string): Promise<TokenResponse> {
-  const res = await fetch(`${API_BASE}/api/v1/auth/verify-otp`, {
+  const res = await apiFetch("/api/v1/auth/verify-otp", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ challenge_id: challengeId, otp }),
@@ -117,7 +160,7 @@ export async function verifyOtp(challengeId: string, otp: string): Promise<Token
 export async function fetchMe(): Promise<AuthUser | null> {
   const token = getStoredToken();
   if (!token) return null;
-  const res = await fetch(`${API_BASE}/api/v1/auth/me`, {
+  const res = await apiFetch("/api/v1/auth/me", {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {

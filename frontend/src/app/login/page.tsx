@@ -4,13 +4,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { Inter } from "next/font/google";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
+  checkApiHealth,
   clearSession,
   loginStep1,
   registerAccount,
   verifyOtp,
 } from "@/lib/authApi";
+import { API_BASE } from "@/lib/pqcHandshake";
 
 const sans = Inter({
   subsets: ["latin"],
@@ -30,6 +32,24 @@ export default function LoginPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [apiOk, setApiOk] = useState<boolean | null>(null);
+  const [smtpOk, setSmtpOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    checkApiHealth()
+      .then((h) => {
+        if (cancelled) return;
+        setApiOk(h.status === "ok");
+        setSmtpOk(Boolean(h.smtp_configured));
+      })
+      .catch(() => {
+        if (!cancelled) setApiOk(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const onLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -125,6 +145,23 @@ export default function LoginPage() {
             </div>
 
             <div className="border border-[#e0e0e0] bg-white p-6">
+              {apiOk === false && (
+                <div className="mb-4">
+                  <Alert kind="error">
+                  Cannot reach the API at {API_BASE}. If you are on the live site, redeploy
+                  the Render backend. Locally, run <code className="text-xs">.\start-local.ps1</code>.
+                  </Alert>
+                </div>
+              )}
+              {apiOk === true && smtpOk === false && step !== "register" && (
+                <div className="mb-4">
+                  <Alert kind="info">
+                  Email OTP is not configured on the API yet. Login will fail until SMTP
+                  settings are added to the server environment.
+                  </Alert>
+                </div>
+              )}
+
               {step !== "otp" && (
                 <div className="mb-6 flex border-b border-[#e0e0e0]">
                   <TabButton

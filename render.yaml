@@ -9,11 +9,20 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.3"
+      - key: HOST
+        value: "0.0.0.0"
       - key: QBRIDGE_SKIP_PQC_VERIFY
         value: "1"
       - key: QBRIDGE_AUTH_DEV_LOG_OTP
         value: "0"
       - key: QBRIDGE_FORCE_MEMORY_DB
         value: "1"
+      - key: QBRIDGE_HSTS
+        value: "1"
+      - key: QBRIDGE_CORS_ORIGINS
+        value: "http://127.0.0.1:3000,http://localhost:3000,https://qbridge-os.vercel.app"
       - key: QBRIDGE_JWT_SECRET
         generateValue: true
+      # Add these in the Render dashboard (Environment tab) for login emails:
+      # QBRIDGE_SMTP_HOST, QBRIDGE_SMTP_PORT, QBRIDGE_SMTP_USER,
+      # QBRIDGE_SMTP_PASSWORD, QBRIDGE_SMTP_FROM, QBRIDGE_SMTP_TLS=1

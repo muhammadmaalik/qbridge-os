@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import os
 import secrets
@@ -178,7 +179,12 @@ async def start_login_otp(user: UserRecord) -> str:
             expires,
         )
 
-    send_otp_email(to_email=user.email, otp_code=otp, username=user.username)
+    await asyncio.to_thread(
+        send_otp_email,
+        to_email=user.email,
+        otp_code=otp,
+        username=user.username,
+    )
     return challenge_id
 
 
