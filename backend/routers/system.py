@@ -6,7 +6,7 @@ import os
 import random
 from fastapi import APIRouter
 
-from backend.email_service import _smtp_configured, email_backend_label
+from backend.database import db
 from backend.routers.security import _skip_pqc_verify_enabled
 from backend.telemetry import get_noise_telemetry
 
@@ -23,14 +23,15 @@ async def system_version():
         "build_id": BUILD_ID,
         "auth_routes": True,
         "features": [
-            "auth_register_login_otp",
+            "auth_register_login",
             "chemistry_vqe_pyqint",
             "finance_qaoa",
             "pqc_handshake",
             "rate_limiting",
+            "ip_registration_limit",
         ],
-        "smtp_configured": _smtp_configured(),
-        "email_backend": email_backend_label(),
+        "user_store": "memory" if db.use_memory else "postgres" if db.pool else "sqlite",
+        "max_registrations_per_ip": int(os.environ.get("QBRIDGE_MAX_REGS_PER_IP", "3")),
     }
 
 

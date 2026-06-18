@@ -15,6 +15,7 @@ from backend.http_security import (
 from backend.routers import auth, entropy, compute, finance, security, system
 from backend.routers.security import _skip_pqc_verify_enabled
 from backend.database import db
+from backend.sqlite_db import sqlite_db
 
 
 def _print_pqc_bypass_banner() -> None:
@@ -39,17 +40,14 @@ async def lifespan(app: FastAPI):
         _print_pqc_bypass_banner()
     await db.connect()
     if db.use_memory:
-        print("Database: in-memory store active (PostgreSQL offline or QBRIDGE_FORCE_MEMORY_DB=1)")
+        print("Database: in-memory store active (QBRIDGE_FORCE_MEMORY_DB=1)")
+    elif db.use_sqlite:
+        print(f"Database: SQLite active ({sqlite_db._path})")
     else:
         print("Connected to PostgreSQL")
     await db.ensure_demo_user()
-    from backend.email_service import _smtp_configured, email_backend_label, smtp_setup_hint
-
-    if _smtp_configured():
-        print(f"Email OTP: configured ({email_backend_label()})")
-    else:
-        print("Email OTP: NOT configured — login will return 503 until SMTP/Brevo env vars are set.")
-        print(smtp_setup_hint())
+    store = "memory" if db.use_memory else "postgres" if db.pool else "sqlite"
+    print(f"User store: {store}")
     yield
     # Shutdown
     await db.disconnect()
@@ -90,13 +88,12 @@ async def health_check() -> dict:
     bypass) so Swagger users can see at a glance whether the gateway is
     running in a dev-bypass posture.
     """
-    from backend.email_service import _smtp_configured
-
+    store = "memory" if db.use_memory else "postgres" if db.pool else "sqlite"
     return {
         "status": "ok",
         "service": "Quantum Bridge OS",
         "auth_enabled": True,
-        "smtp_configured": _smtp_configured(),
+        "user_store": store,
         "pqc_auth_bypass_active": _skip_pqc_verify_enabled(),
         "pqc_auth_bypass_env_var": "QBRIDGE_SKIP_PQC_VERIFY",
     }

@@ -88,6 +88,7 @@ def _send_via_brevo(*, to_email: str, subject: str, body: str) -> None:
             )
             res.raise_for_status()
     except Exception as exc:
+        logger.exception("Brevo OTP delivery failed for %s", to_email)
         raise EmailDeliveryError(
             f"Failed to send verification email via Brevo to {to_email}: {exc}"
         ) from exc
@@ -102,12 +103,15 @@ def _send_via_smtp(*, to_email: str, msg: EmailMessage) -> None:
 
     try:
         with smtplib.SMTP(host, port, timeout=15) as smtp:
+            smtp.ehlo()
             if use_tls:
                 smtp.starttls()
+                smtp.ehlo()
             if user:
                 smtp.login(user, password)
             smtp.send_message(msg)
     except Exception as exc:
+        logger.exception("SMTP OTP delivery failed for %s via %s:%s", to_email, host, port)
         raise EmailDeliveryError(
             f"Failed to send verification email to {to_email}: {exc}"
         ) from exc

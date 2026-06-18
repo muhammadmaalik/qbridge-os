@@ -8,9 +8,8 @@ import { FormEvent, useEffect, useState } from "react";
 import {
   checkApiHealth,
   clearSession,
-  loginStep1,
+  login,
   registerAccount,
-  verifyOtp,
 } from "@/lib/authApi";
 import { API_BASE } from "@/lib/pqcHandshake";
 
@@ -19,7 +18,7 @@ const sans = Inter({
   weight: ["400", "500", "600"],
 });
 
-type Step = "credentials" | "otp" | "register";
+type Step = "credentials" | "register";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,13 +26,10 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
-  const [otp, setOtp] = useState("");
-  const [challengeId, setChallengeId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [apiOk, setApiOk] = useState<boolean | null>(null);
-  const [smtpOk, setSmtpOk] = useState<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,7 +37,6 @@ export default function LoginPage() {
       .then((h) => {
         if (cancelled) return;
         setApiOk(h.status === "ok");
-        setSmtpOk(Boolean(h.smtp_configured));
       })
       .catch(() => {
         if (!cancelled) setApiOk(false);
@@ -56,24 +51,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await loginStep1(email, password);
-      setChallengeId(res.challenge_id);
-      setMessage(res.message);
-      setOtp("");
-      setStep("otp");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onVerify = async (e: FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      await verifyOtp(challengeId, otp);
+      await login(email, password);
       router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -135,12 +113,10 @@ export default function LoginPage() {
           <div className="w-full max-w-[400px]">
             <div className="mb-8">
               <h1 className="text-[1.75rem] font-semibold leading-tight text-[#161616]">
-                {step === "register" ? "Create account" : step === "otp" ? "Verify your email" : "Log in"}
+                {step === "register" ? "Create account" : "Log in"}
               </h1>
               <p className="mt-2 text-sm text-[#525252]">
-                {step === "otp"
-                  ? "Enter the 6-digit code we sent to your email address."
-                  : "Use your organizational email and password to continue."}
+                Use your email and password to continue.
               </p>
             </div>
 
@@ -153,39 +129,27 @@ export default function LoginPage() {
                   </Alert>
                 </div>
               )}
-              {apiOk === true && smtpOk === false && step !== "register" && (
-                <div className="mb-4">
-                  <Alert kind="info">
-                  Email OTP is not configured on Render yet. In{" "}
-                  <strong>dashboard.render.com → qbridge-os → Environment</strong>, add
-                  Brevo or Gmail SMTP variables (see <code className="text-xs">docs/DEPLOY_RENDER.md</code>
-                  ), save, and wait for redeploy.
-                  </Alert>
-                </div>
-              )}
 
-              {step !== "otp" && (
-                <div className="mb-6 flex border-b border-[#e0e0e0]">
-                  <TabButton
-                    active={step !== "register"}
-                    onClick={() => {
-                      setStep("credentials");
-                      setError("");
-                    }}
-                  >
-                    Log in
-                  </TabButton>
-                  <TabButton
-                    active={step === "register"}
-                    onClick={() => {
-                      setStep("register");
-                      setError("");
-                    }}
-                  >
-                    Register
-                  </TabButton>
-                </div>
-              )}
+              <div className="mb-6 flex border-b border-[#e0e0e0]">
+                <TabButton
+                  active={step !== "register"}
+                  onClick={() => {
+                    setStep("credentials");
+                    setError("");
+                  }}
+                >
+                  Log in
+                </TabButton>
+                <TabButton
+                  active={step === "register"}
+                  onClick={() => {
+                    setStep("register");
+                    setError("");
+                  }}
+                >
+                  Register
+                </TabButton>
+              </div>
 
               {step === "register" && (
                 <form onSubmit={onRegister} className="space-y-5">
@@ -221,35 +185,7 @@ export default function LoginPage() {
                   />
                   {message && <Alert kind="info">{message}</Alert>}
                   {error && <Alert kind="error">{error}</Alert>}
-                  <SubmitButton loading={loading}>Continue</SubmitButton>
-                </form>
-              )}
-
-              {step === "otp" && (
-                <form onSubmit={onVerify} className="space-y-5">
-                  {message && <Alert kind="info">{message}</Alert>}
-                  <Field
-                    label="Security code"
-                    value={otp}
-                    onChange={setOtp}
-                    placeholder="000000"
-                    maxLength={6}
-                    inputMode="numeric"
-                    required
-                  />
-                  {error && <Alert kind="error">{error}</Alert>}
-                  <SubmitButton loading={loading}>Verify and continue</SubmitButton>
-                  <button
-                    type="button"
-                    className="w-full text-sm text-[#0f62fe] hover:underline"
-                    onClick={() => {
-                      setStep("credentials");
-                      setOtp("");
-                      setError("");
-                    }}
-                  >
-                    Back to log in
-                  </button>
+                  <SubmitButton loading={loading}>Sign in</SubmitButton>
                 </form>
               )}
             </div>
@@ -309,8 +245,6 @@ function Field({
   required,
   placeholder,
   hint,
-  maxLength,
-  inputMode,
 }: {
   label: string;
   value: string;
@@ -319,8 +253,6 @@ function Field({
   required?: boolean;
   placeholder?: string;
   hint?: string;
-  maxLength?: number;
-  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
 }) {
   return (
     <label className="block">
@@ -333,8 +265,6 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         required={required}
         placeholder={placeholder}
-        maxLength={maxLength}
-        inputMode={inputMode}
         className="mt-2 w-full border-0 border-b border-[#8d8d8d] bg-[#f4f4f4] px-3 py-3 text-sm text-[#161616] placeholder:text-[#a8a8a8] focus:border-[#0f62fe] focus:bg-white focus:outline-none"
       />
       {hint && <span className="mt-2 block text-xs text-[#6f6f6f]">{hint}</span>}

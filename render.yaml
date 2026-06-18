@@ -1,3 +1,9 @@
+databases:
+  - name: qbridge-db
+    databaseName: qaas_db
+    user: qbridge
+    plan: free
+
 services:
   - type: web
     name: qbridge-os
@@ -14,30 +20,15 @@ services:
         value: "0.0.0.0"
       - key: QBRIDGE_SKIP_PQC_VERIFY
         value: "1"
-      - key: QBRIDGE_AUTH_DEV_LOG_OTP
-        value: "0"
-      - key: QBRIDGE_FORCE_MEMORY_DB
-        value: "1"
       - key: QBRIDGE_HSTS
         value: "1"
       - key: QBRIDGE_CORS_ORIGINS
         value: "http://127.0.0.1:3000,http://localhost:3000,https://qbridge-os.vercel.app"
       - key: QBRIDGE_JWT_SECRET
         generateValue: true
-      # Login OTP — set in Render dashboard (sync: false = you must fill values)
-      - key: QBRIDGE_BREVO_API_KEY
-        sync: false
-      - key: QBRIDGE_BREVO_SENDER_EMAIL
-        sync: false
-      - key: QBRIDGE_SMTP_HOST
-        sync: false
-      - key: QBRIDGE_SMTP_PORT
-        value: "587"
-      - key: QBRIDGE_SMTP_USER
-        sync: false
-      - key: QBRIDGE_SMTP_PASSWORD
-        sync: false
-      - key: QBRIDGE_SMTP_FROM
-        sync: false
-      - key: QBRIDGE_SMTP_TLS
-        value: "1"
+      - key: QBRIDGE_MAX_REGS_PER_IP
+        value: "3"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: qbridge-db
+          property: connectionString

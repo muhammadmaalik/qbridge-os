@@ -10,13 +10,6 @@ export type AuthUser = {
   username: string;
 };
 
-export type LoginStep = {
-  status: string;
-  challenge_id: string;
-  message: string;
-  expires_in_seconds: number;
-};
-
 export type TokenResponse = {
   access_token: string;
   token_type: string;
@@ -26,7 +19,7 @@ export type TokenResponse = {
 export type ApiHealth = {
   status?: string;
   auth_enabled?: boolean;
-  smtp_configured?: boolean;
+  user_store?: string;
 };
 
 export function getStoredToken(): string | null {
@@ -99,15 +92,7 @@ async function parseError(res: Response, path: string): Promise<string> {
   }
   try {
     const j = (await res.json()) as { detail?: string | { msg?: string }[] };
-    if (typeof j.detail === "string") {
-      if (res.status === 503 && /email|smtp|brevo|configured/i.test(j.detail)) {
-        const onRender = API_BASE.includes("onrender.com");
-        return onRender
-          ? "Email is not configured on Render. Open dashboard.render.com → qbridge-os → Environment → add Brevo or Gmail SMTP variables (see docs/DEPLOY_RENDER.md), then redeploy."
-          : "Email is not configured on the server. Copy .env.example to .env, set QBRIDGE_SMTP_* or QBRIDGE_BREVO_*, then restart the backend.";
-      }
-      return j.detail;
-    }
+    if (typeof j.detail === "string") return j.detail;
     if (Array.isArray(j.detail) && j.detail[0]?.msg) return j.detail[0].msg;
   } catch {
     /* ignore */
@@ -135,23 +120,13 @@ export async function registerAccount(
   return (await res.json()) as AuthUser;
 }
 
-export async function loginStep1(email: string, password: string): Promise<LoginStep> {
+export async function login(email: string, password: string): Promise<TokenResponse> {
   const res = await apiFetch("/api/v1/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) throw new Error(await parseError(res, "/api/v1/auth/login"));
-  return (await res.json()) as LoginStep;
-}
-
-export async function verifyOtp(challengeId: string, otp: string): Promise<TokenResponse> {
-  const res = await apiFetch("/api/v1/auth/verify-otp", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ challenge_id: challengeId, otp }),
-  });
-  if (!res.ok) throw new Error(await parseError(res, "/api/v1/auth/verify-otp"));
   const data = (await res.json()) as TokenResponse;
   saveSession(data.access_token, data.user);
   return data;

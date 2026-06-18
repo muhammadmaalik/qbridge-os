@@ -1,18 +1,14 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 
-from backend.email_service import EmailDeliveryError
 from backend.user_auth import (
-    OTP_EXPIRE_MINUTES,
     authenticate_password,
     create_access_token,
     decode_access_token,
     register_user,
-    start_login_otp,
-    verify_login_otp,
 )
 
 router = APIRouter(tags=["auth"])
@@ -30,28 +26,23 @@ class LoginPayload(BaseModel):
     password: str
 
 
-class VerifyOtpPayload(BaseModel):
-    challenge_id: str
-    otp: str = Field(min_length=6, max_length=6)
-
-
 class AuthUserResponse(BaseModel):
     id: str
     email: str
     username: str
 
 
-class LoginStepResponse(BaseModel):
-    status: str = "otp_required"
-    challenge_id: str
-    message: str
-    expires_in_seconds: int
-
-
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: AuthUserResponse
+
+
+def client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    if forwarded:
+        return forwarded
+    return request.client.host if request.client else "unknown"
 
 
 async def get_current_user(
@@ -71,39 +62,23 @@ async def get_current_user(
 
 
 @router.post("/register", response_model=AuthUserResponse)
-async def register(payload: RegisterPayload):
+async def register(payload: RegisterPayload, request: Request):
     try:
         user = await register_user(
             email=payload.email,
             password=payload.password,
             username=payload.username,
+            client_ip=client_ip(request),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return AuthUserResponse(id=user.id, email=user.email, username=user.username)
 
 
-@router.post("/login", response_model=LoginStepResponse)
+@router.post("/login", response_model=TokenResponse)
 async def login(payload: LoginPayload):
     try:
         user = await authenticate_password(email=payload.email, password=payload.password)
-        challenge_id = await start_login_otp(user)
-    except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e)) from e
-    except EmailDeliveryError as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
-
-    return LoginStepResponse(
-        challenge_id=challenge_id,
-        message=f"A 6-digit security code was sent to {user.email}. Check your inbox and spam folder.",
-        expires_in_seconds=OTP_EXPIRE_MINUTES * 60,
-    )
-
-
-@router.post("/verify-otp", response_model=TokenResponse)
-async def verify_otp(payload: VerifyOtpPayload):
-    try:
-        user = await verify_login_otp(challenge_id=payload.challenge_id, otp=payload.otp)
         token = create_access_token(
             user_id=user.id, email=user.email, username=user.username
         )

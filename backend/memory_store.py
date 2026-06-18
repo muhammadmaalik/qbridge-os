@@ -35,6 +35,7 @@ class InMemoryStore:
         self.users_by_email: dict[str, MemoryUser] = {}
         self.jobs: dict[str, MemoryJob] = {}
         self.api_keys: dict[tuple[str, str], str] = {}  # (user_id, provider) -> key
+        self.registration_ips: list[tuple[str, str]] = []
         self._ensure_demo_user()
 
     def _ensure_demo_user(self) -> None:
@@ -99,6 +100,12 @@ class InMemoryStore:
     def upsert_api_key(self, user_id: str, provider: str, key: str) -> str:
         self.api_keys[(user_id, provider.upper())] = key
         return str(uuid.uuid4())
+
+    def count_registrations_by_ip(self, ip: str) -> int:
+        return sum(1 for registered_ip, _ in self.registration_ips if registered_ip == ip)
+
+    def record_registration_ip(self, ip: str, user_id: str) -> None:
+        self.registration_ips.append((ip, user_id))
 
 
 memory = InMemoryStore()
@@ -176,6 +183,16 @@ def handle_fetchval(query: str, *args: Any) -> Any:
         provider = str(args[1]) if len(args) > 1 else "IBM"
         key = str(args[2]) if len(args) > 2 else ""
         return memory.upsert_api_key(user_id, provider, key)
+
+    if "FROM registration_ips" in q and "COUNT" in q.upper():
+        ip = str(args[0]) if args else ""
+        return memory.count_registrations_by_ip(ip)
+
+    if "INSERT INTO registration_ips" in q:
+        ip = str(args[0]) if args else ""
+        user_id = str(args[1]) if len(args) > 1 else ""
+        memory.record_registration_ip(ip, user_id)
+        return "OK"
 
     return None
 
