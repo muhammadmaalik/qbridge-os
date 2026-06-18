@@ -19,6 +19,8 @@
   <a href="#-system-architecture">Architecture</a> •
   <a href="#-core-modules">Core Modules</a> •
   <a href="#-installation--quick-start">Quick Start</a> •
+  <a href="docs/INVESTOR_OVERVIEW.md">Investor Overview</a> •
+  <a href="docs/DEPLOY_RENDER.md">Deploy API</a> •
   <a href="#-post-quantum-security-pqc">Security</a>
 </p>
 
