@@ -2,13 +2,35 @@
 
 from __future__ import annotations
 
+import os
 import random
 from fastapi import APIRouter
 
+from backend.email_service import _smtp_configured
 from backend.routers.security import _skip_pqc_verify_enabled
 from backend.telemetry import get_noise_telemetry
 
 router = APIRouter()
+
+BUILD_ID = os.environ.get("RENDER_GIT_COMMIT", "local-dev")[:12]
+
+
+@router.get("/version")
+async def system_version():
+    """Deployment fingerprint — use after Render redeploy to confirm the live API is current."""
+    return {
+        "service": "Quantum Bridge OS API",
+        "build_id": BUILD_ID,
+        "auth_routes": True,
+        "features": [
+            "auth_register_login_otp",
+            "chemistry_vqe_pyqint",
+            "finance_qaoa",
+            "pqc_handshake",
+            "rate_limiting",
+        ],
+        "smtp_configured": _smtp_configured(),
+    }
 
 
 @router.get("/status")
