@@ -40,50 +40,55 @@ export default function KeyManager() {
   };
 
   return (
-    <div className="border border-zinc-800 bg-zinc-900/40 p-6 rounded-xl shadow-sm relative">
-      {/* Toast Notification */}
+    <div className="relative border border-[#e0e0e0] bg-white p-6">
       {toast && (
-        <div className={`absolute -top-12 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg border text-sm font-medium z-50 flex items-center gap-2 transition-all animate-in fade-in slide-in-from-top-2 ${toast.type === "success" ? "bg-emerald-950/80 border-emerald-800 text-emerald-400" : "bg-red-950/80 border-red-800 text-red-400"}`}>
+        <div
+          className={`absolute -top-12 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 border px-4 py-2 text-sm font-medium ${
+            toast.type === "success"
+              ? "border-[#a7f0ba] bg-[#defbe6] text-[#198038]"
+              : "border-[#ffb3b8] bg-[#fff1f1] text-[#da1e28]"
+          }`}
+        >
           {toast.type === "success" ? (
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
           ) : (
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           )}
           {toast.message}
         </div>
       )}
 
-      <h2 className="text-zinc-100 mb-5 font-semibold text-sm tracking-wide flex items-center gap-2">
-        <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
-        Identity & Security
+      <h2 className="mb-5 flex items-center gap-2 text-sm font-semibold tracking-wide text-[#161616]">
+        <svg className="h-4 w-4 text-[#6f6f6f]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+        Identity &amp; security
       </h2>
       <form onSubmit={handleSave} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-zinc-400 font-medium">Username</label>
+          <label className="text-xs font-medium uppercase tracking-wide text-[#525252]">Username</label>
           <input
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="bg-zinc-950/50 border border-zinc-800 text-zinc-200 px-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
-            placeholder="System User"
+            className="border-0 border-b border-[#8d8d8d] bg-[#f4f4f4] px-3 py-3 text-sm text-[#161616] focus:border-[#0f62fe] focus:bg-white focus:outline-none"
+            placeholder="System user"
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-zinc-400 font-medium">IBM Quantum Key</label>
+          <label className="text-xs font-medium uppercase tracking-wide text-[#525252]">IBM Quantum key</label>
           <input
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            className="bg-zinc-950/50 border border-zinc-800 text-zinc-200 px-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
+            className="border-0 border-b border-[#8d8d8d] bg-[#f4f4f4] px-3 py-3 text-sm text-[#161616] focus:border-[#0f62fe] focus:bg-white focus:outline-none"
             placeholder="Enter quantum token..."
             required
           />
         </div>
         <button
           type="submit"
-          className="bg-zinc-100 hover:bg-white text-zinc-900 font-medium py-2 px-4 rounded-lg text-sm transition-all duration-200 mt-2 flex items-center justify-center gap-2 shadow-sm"
+          className="mt-2 flex items-center justify-center gap-2 bg-[#0f62fe] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#0353e9]"
         >
-          Save Credentials
+          Save credentials
         </button>
       </form>
     </div>

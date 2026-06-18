@@ -53,13 +53,13 @@ function scanEnergyYDomain(curve: { energy: number }[]): [number, number] {
 function badgeClass(status: string) {
   switch (status) {
     case "success":
-      return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
+      return "bg-[#defbe6] text-[#198038] border-[#a7f0ba]";
     case "error":
-      return "bg-red-500/10 text-red-500 border-red-500/20";
+      return "bg-[#fff1f1] text-[#da1e28] border-[#ffb3b8]";
     case "running":
-      return "bg-amber-500/10 text-amber-500 border-amber-500/20";
+      return "bg-[#fff8e1] text-[#b28600] border-[#fddc69]";
     default:
-      return "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
+      return "bg-[#f4f4f4] text-[#525252] border-[#e0e0e0]";
   }
 }
 
@@ -94,23 +94,23 @@ const ActivityLogRow = memo(function ActivityLogRow({ log }: { log: LogEntry }) 
         {log.status}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-zinc-300 leading-relaxed">{log.message}</p>
+        <p className="text-[#161616] leading-relaxed">{log.message}</p>
 
         {showViz && log.data && (
-          <div className="mt-2 bg-zinc-950/50 border border-zinc-800 rounded-lg p-3 shadow-inner">
-            <div className="flex justify-between items-center mb-2 pb-2 border-b border-zinc-800/50">
-              <span className="text-xs font-semibold text-zinc-400">
+          <div className="mt-2 border border-[#e0e0e0] bg-[#f4f4f4] p-3">
+            <div className="mb-2 flex items-center justify-between border-b border-[#e0e0e0] pb-2">
+              <span className="text-xs font-semibold text-[#525252]">
                 {log.data.is_scan ? "PES scan" : "VQE Results"} (
                 {log.data.molecule || "Molecule"})
               </span>
-              <span className="text-[10px] font-mono text-zinc-500">
+              <span className="text-[10px] font-mono text-[#6f6f6f]">
                 {log.data.backend || "Simulator"}
               </span>
             </div>
 
             {log.data.is_scan && scanCurve && yDomain && (
               <div className="mb-4 w-full min-w-0 font-sans">
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">
+                <p className="mb-2 text-[10px] uppercase tracking-wider text-[#6f6f6f]">
                   Potential energy surface (Å vs Hartree)
                 </p>
                 {/* Explicit box size so ResponsiveContainer never measures 0×0 (flex/scroll parents). */}
@@ -123,22 +123,22 @@ const ActivityLogRow = memo(function ActivityLogRow({ log }: { log: LogEntry }) 
                       data={scanCurve}
                       margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                       <XAxis
                         dataKey="distance"
-                        stroke="#71717a"
+                        stroke="#6f6f6f"
                         tick={{ fontSize: 10 }}
                         label={{
                           value: "r (Å)",
                           position: "insideBottom",
                           offset: -2,
-                          fill: "#71717a",
+                          fill: "#6f6f6f",
                           fontSize: 10,
                         }}
                       />
                       <YAxis
                         dataKey="energy"
-                        stroke="#71717a"
+                        stroke="#6f6f6f"
                         tick={{ fontSize: 10 }}
                         width={56}
                         domain={yDomain}
@@ -147,15 +147,15 @@ const ActivityLogRow = memo(function ActivityLogRow({ log }: { log: LogEntry }) 
                           value: "E (Ha)",
                           angle: -90,
                           position: "insideLeft",
-                          fill: "#71717a",
+                          fill: "#6f6f6f",
                           fontSize: 10,
                         }}
                       />
                       <Tooltip
                         contentStyle={{
-                          background: "#18181b",
-                          border: "1px solid #3f3f46",
-                          borderRadius: 6,
+                          background: "#ffffff",
+                          border: "1px solid #e0e0e0",
+                          borderRadius: 0,
                           fontSize: 12,
                         }}
                         labelFormatter={(v) => `r = ${v} Å`}
@@ -177,7 +177,7 @@ const ActivityLogRow = memo(function ActivityLogRow({ log }: { log: LogEntry }) 
             <div className="flex min-w-0 flex-col gap-4 md:flex-row">
               <div className="flex w-full flex-col gap-1 md:w-1/2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-zinc-500">
+                  <span className="text-[#6f6f6f]">
                     {log.data.is_scan ? "Best energy" : "Ground State Energy"}
                   </span>
                   <span className="font-mono font-bold text-emerald-400">
@@ -188,12 +188,12 @@ const ActivityLogRow = memo(function ActivityLogRow({ log }: { log: LogEntry }) 
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-zinc-500">Circuit Depth</span>
-                  <span className="font-mono text-zinc-300">{log.data.depth}</span>
+                  <span className="text-[#6f6f6f]">Circuit Depth</span>
+                  <span className="font-mono text-[#161616]">{log.data.depth}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-zinc-500">Qubits Used</span>
-                  <span className="font-mono text-zinc-300">{log.data.qubits}</span>
+                  <span className="text-[#6f6f6f]">Qubits Used</span>
+                  <span className="font-mono text-[#161616]">{log.data.qubits}</span>
                 </div>
               </div>
 
@@ -204,7 +204,7 @@ const ActivityLogRow = memo(function ActivityLogRow({ log }: { log: LogEntry }) 
           </div>
         )}
 
-        <p className="mt-1 text-[10px] text-zinc-600">{log.timestamp}</p>
+        <p className="mt-1 text-[10px] text-[#6f6f6f]">{log.timestamp}</p>
       </div>
     </div>
   );
@@ -327,33 +327,33 @@ export default function Console() {
   return (
     <div
       id="section-console"
-      className="flex min-h-[560px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40 p-0 shadow-sm"
+      className="flex min-h-[560px] flex-col overflow-hidden border border-[#e0e0e0] bg-white p-0"
     >
       <div
         id="section-terminal"
-        className="scroll-mt-28 p-4 pb-2 border-b border-zinc-800/60 bg-zinc-950/30"
+        className="scroll-mt-28 border-b border-[#e0e0e0] bg-[#161616] p-4 pb-2"
       >
-        <h2 className="text-zinc-100 font-semibold text-xs tracking-widest uppercase mb-3 flex items-center gap-2 text-zinc-400">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]" />
-          Main Control Unit
+        <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[#c6c6c6]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#24a148]" />
+          Main control unit
         </h2>
         <QuantumTerminal ref={terminalRef} />
       </div>
       <div
         id="section-activity"
-        className="scroll-mt-28 flex min-h-0 flex-1 flex-col border-t border-zinc-800/40"
+        className="scroll-mt-28 flex min-h-0 flex-1 flex-col border-t border-[#e0e0e0]"
       >
-        <div className="flex justify-between items-center px-4 py-3 border-b border-zinc-800/80 bg-zinc-900/50">
-          <h3 className="text-zinc-300 font-medium text-sm tracking-wide flex items-center gap-2">
-            <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
-            Recent Activity
+        <div className="flex items-center justify-between border-b border-[#e0e0e0] bg-[#f4f4f4] px-4 py-3">
+          <h3 className="flex items-center gap-2 text-sm font-medium tracking-wide text-[#161616]">
+            <svg className="h-4 w-4 text-[#6f6f6f]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+            Recent activity
           </h3>
-          <span className="text-xs text-zinc-500 font-medium px-2 py-1 bg-zinc-800/50 rounded-md">Live Feed</span>
+          <span className="bg-white px-2 py-1 text-xs font-medium text-[#525252] border border-[#e0e0e0]">Live feed</span>
         </div>
 
         <div
           ref={activityScrollRef}
-          className="custom-scrollbar flex max-h-[280px] min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4"
+          className="dashboard-scrollbar flex max-h-[280px] min-h-0 flex-1 flex-col gap-4 overflow-y-auto bg-white p-4"
         >
           {logs.map((log) => (
             <ActivityLogRow key={log.id} log={log} />
