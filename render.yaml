@@ -24,3 +24,20 @@ services:
         value: "http://127.0.0.1:3000,http://localhost:3000,https://qbridge-os.vercel.app"
       - key: QBRIDGE_JWT_SECRET
         generateValue: true
+      # Login OTP — set in Render dashboard (sync: false = you must fill values)
+      - key: QBRIDGE_BREVO_API_KEY
+        sync: false
+      - key: QBRIDGE_BREVO_SENDER_EMAIL
+        sync: false
+      - key: QBRIDGE_SMTP_HOST
+        sync: false
+      - key: QBRIDGE_SMTP_PORT
+        value: "587"
+      - key: QBRIDGE_SMTP_USER
+        sync: false
+      - key: QBRIDGE_SMTP_PASSWORD
+        sync: false
+      - key: QBRIDGE_SMTP_FROM
+        sync: false
+      - key: QBRIDGE_SMTP_TLS
+        value: "1"

@@ -156,8 +156,10 @@ export default function LoginPage() {
               {apiOk === true && smtpOk === false && step !== "register" && (
                 <div className="mb-4">
                   <Alert kind="info">
-                  Email OTP is not configured on the API yet. Login will fail until SMTP
-                  settings are added to the server environment.
+                  Email OTP is not configured on Render yet. In{" "}
+                  <strong>dashboard.render.com → qbridge-os → Environment</strong>, add
+                  Brevo or Gmail SMTP variables (see <code className="text-xs">docs/DEPLOY_RENDER.md</code>
+                  ), save, and wait for redeploy.
                   </Alert>
                 </div>
               )}

@@ -100,11 +100,11 @@ async function parseError(res: Response, path: string): Promise<string> {
   try {
     const j = (await res.json()) as { detail?: string | { msg?: string }[] };
     if (typeof j.detail === "string") {
-      if (res.status === 503 && j.detail.includes("QBRIDGE_SMTP")) {
-        return (
-          "Email is not configured on the server. Add SMTP settings to the API .env " +
-          "(see .env.example), then restart the backend."
-        );
+      if (res.status === 503 && /email|smtp|brevo|configured/i.test(j.detail)) {
+        const onRender = API_BASE.includes("onrender.com");
+        return onRender
+          ? "Email is not configured on Render. Open dashboard.render.com → qbridge-os → Environment → add Brevo or Gmail SMTP variables (see docs/DEPLOY_RENDER.md), then redeploy."
+          : "Email is not configured on the server. Copy .env.example to .env, set QBRIDGE_SMTP_* or QBRIDGE_BREVO_*, then restart the backend.";
       }
       return j.detail;
     }

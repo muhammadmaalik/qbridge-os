@@ -43,6 +43,13 @@ async def lifespan(app: FastAPI):
     else:
         print("Connected to PostgreSQL")
     await db.ensure_demo_user()
+    from backend.email_service import _smtp_configured, email_backend_label, smtp_setup_hint
+
+    if _smtp_configured():
+        print(f"Email OTP: configured ({email_backend_label()})")
+    else:
+        print("Email OTP: NOT configured — login will return 503 until SMTP/Brevo env vars are set.")
+        print(smtp_setup_hint())
     yield
     # Shutdown
     await db.disconnect()

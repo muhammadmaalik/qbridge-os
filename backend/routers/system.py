@@ -6,7 +6,7 @@ import os
 import random
 from fastapi import APIRouter
 
-from backend.email_service import _smtp_configured
+from backend.email_service import _smtp_configured, email_backend_label
 from backend.routers.security import _skip_pqc_verify_enabled
 from backend.telemetry import get_noise_telemetry
 
@@ -30,6 +30,7 @@ async def system_version():
             "rate_limiting",
         ],
         "smtp_configured": _smtp_configured(),
+        "email_backend": email_backend_label(),
     }
 
 
