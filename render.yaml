@@ -3,7 +3,8 @@ services:
     name: qbridge-os
     runtime: python
     plan: free
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    rootDir: .
+    buildCommand: bash render-build.sh
     startCommand: HOST=0.0.0.0 python run_api.py
     healthCheckPath: /health
     envVars:
@@ -23,6 +24,3 @@ services:
         value: "http://127.0.0.1:3000,http://localhost:3000,https://qbridge-os.vercel.app"
       - key: QBRIDGE_JWT_SECRET
         generateValue: true
-      # Add these in the Render dashboard (Environment tab) for login emails:
-      # QBRIDGE_SMTP_HOST, QBRIDGE_SMTP_PORT, QBRIDGE_SMTP_USER,
-      # QBRIDGE_SMTP_PASSWORD, QBRIDGE_SMTP_FROM, QBRIDGE_SMTP_TLS=1
