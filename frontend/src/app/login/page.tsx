@@ -9,7 +9,8 @@ import {
   checkApiHealth,
   clearSession,
   login,
-  registerAccount,
+  registerAndLogin,
+  wakeApi,
 } from "@/lib/authApi";
 import { API_BASE } from "@/lib/pqcHandshake";
 
@@ -25,32 +26,50 @@ export default function LoginPage() {
   const [step, setStep] = useState<Step>("credentials");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [username, setUsername] = useState("");
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [apiOk, setApiOk] = useState<boolean | null>(null);
+  const [waking, setWaking] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    checkApiHealth()
-      .then((h) => {
-        if (cancelled) return;
-        setApiOk(h.status === "ok");
-      })
-      .catch(() => {
+    (async () => {
+      setWaking(true);
+      try {
+        const h = await checkApiHealth();
+        if (!cancelled) {
+          setApiOk(h.status === "ok");
+        }
+      } catch {
         if (!cancelled) setApiOk(false);
-      });
+      } finally {
+        if (!cancelled) setWaking(false);
+      }
+    })();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const ensureApi = async (): Promise<boolean> => {
+    if (apiOk) return true;
+    setWaking(true);
+    const ok = await wakeApi();
+    setApiOk(ok);
+    setWaking(false);
+    return ok;
+  };
 
   const onLogin = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
+      if (!(await ensureApi())) {
+        throw new Error(
+          "Server is still starting. Wait 30 seconds and click Sign in again."
+        );
+      }
       await login(email, password);
       router.push("/");
     } catch (err) {
@@ -65,9 +84,13 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await registerAccount(email, password, username || undefined);
-      setMessage("Account created. Sign in with your email and password.");
-      setStep("credentials");
+      if (!(await ensureApi())) {
+        throw new Error(
+          "Server is still starting. Wait 30 seconds and click Create account again."
+        );
+      }
+      await registerAndLogin(email, password);
+      router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -103,8 +126,7 @@ export default function LoginPage() {
               Secure access to quantum simulation tools
             </h2>
             <p className="mt-3 max-w-lg text-sm leading-relaxed text-[#e8e8e8]">
-              Sign in to run chemistry VQE workloads, portfolio optimization, and
-              post-quantum secured API sessions.
+              Email and password only — no verification codes.
             </p>
           </div>
         </aside>
@@ -116,16 +138,24 @@ export default function LoginPage() {
                 {step === "register" ? "Create account" : "Log in"}
               </h1>
               <p className="mt-2 text-sm text-[#525252]">
-                Use your email and password to continue.
+                Email and password — that&apos;s it.
               </p>
             </div>
 
             <div className="border border-[#e0e0e0] bg-white p-6">
-              {apiOk === false && (
+              {waking && (
+                <div className="mb-4">
+                  <Alert kind="info">
+                    Connecting to the server… first load can take up to a minute on
+                    the free hosting tier.
+                  </Alert>
+                </div>
+              )}
+              {!waking && apiOk === false && (
                 <div className="mb-4">
                   <Alert kind="error">
-                  Cannot reach the API at {API_BASE}. If you are on the live site, redeploy
-                  the Render backend. Locally, run <code className="text-xs">.\start-local.ps1</code>.
+                    Server at {API_BASE} is not responding yet. Wait 30 seconds and
+                    try again — Render free tier sleeps when idle.
                   </Alert>
                 </div>
               )}
@@ -155,12 +185,6 @@ export default function LoginPage() {
                 <form onSubmit={onRegister} className="space-y-5">
                   <Field label="Email" type="email" value={email} onChange={setEmail} required />
                   <Field
-                    label="Username (optional)"
-                    value={username}
-                    onChange={setUsername}
-                    placeholder="Defaults to email prefix"
-                  />
-                  <Field
                     label="Password"
                     type="password"
                     value={password}
@@ -169,7 +193,9 @@ export default function LoginPage() {
                     hint="Minimum 8 characters"
                   />
                   {error && <Alert kind="error">{error}</Alert>}
-                  <SubmitButton loading={loading}>Create account</SubmitButton>
+                  <SubmitButton loading={loading || waking}>
+                    {loading ? "Please wait…" : "Create account"}
+                  </SubmitButton>
                 </form>
               )}
 
@@ -183,9 +209,10 @@ export default function LoginPage() {
                     onChange={setPassword}
                     required
                   />
-                  {message && <Alert kind="info">{message}</Alert>}
                   {error && <Alert kind="error">{error}</Alert>}
-                  <SubmitButton loading={loading}>Sign in</SubmitButton>
+                  <SubmitButton loading={loading || waking}>
+                    {loading ? "Please wait…" : "Sign in"}
+                  </SubmitButton>
                 </form>
               )}
             </div>
@@ -285,7 +312,7 @@ function SubmitButton({
       disabled={loading}
       className="w-full bg-[#0f62fe] px-4 py-3 text-sm font-medium text-white hover:bg-[#0353e9] disabled:opacity-50"
     >
-      {loading ? "Please wait..." : children}
+      {children}
     </button>
   );
 }

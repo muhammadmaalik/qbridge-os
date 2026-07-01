@@ -42,7 +42,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         app,
         *,
         default_rpm: int = 120,
-        auth_rpm: int = 15,
+        auth_rpm: int = 40,
         compute_rpm: int = 30,
     ) -> None:
         super().__init__(app)
